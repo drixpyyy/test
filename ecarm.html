@@ -1,34 +1,24 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Roblox Screen Capture Relay</title>
+    <title>Roblox Screen Relay</title>
     <style>
-        body { font-family: sans-serif; background: #222; color: #fff; text-align: center; }
-        canvas { border: 1px solid #555; background: #000; max-width: 100%; }
-        .controls { margin: 20px; }
-        button { padding: 10px; cursor: pointer; }
-        #status { color: #0f0; margin: 10px; }
+        body { background: #111; color: white; font-family: sans-serif; text-align: center; }
+        canvas { border: 2px solid #444; margin-top: 10px; background: #000; width: 400px; }
+        .status { color: #0f0; font-weight: bold; }
     </style>
 </head>
 <body>
-    <h1>Roblox Screen to Parts Relay</h1>
-    <div class="controls">
-        <button onclick="startCapture()">1. Start Screen Capture</button>
-        <select id="quality">
-            <option value="20">140p (20px wide - Fastest)</option>
-            <option value="40">320p (40px wide)</option>
-            <option value="80">720p (80px wide - Laggy)</option>
-            <option value="120">1080p (120px wide - Max for Parts)</option>
-        </select>
-    </div>
-    <div id="status">Waiting...</div>
-    <canvas id="preview"></canvas>
+    <h2>Roblox Screen Capture</h2>
+    <p>1. Click Start and select the <b>Roblox Window</b></p>
+    <button onclick="startCapture()" style="padding:10px 20px; cursor:pointer;">Start Capture</button>
+    <p id="status">Status: Waiting...</p>
+    <canvas id="prev"></canvas>
 
     <script>
-        const canvas = document.getElementById('preview');
+        const canvas = document.getElementById('prev');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         let video = document.createElement('video');
-        let interval;
 
         async function startCapture() {
             try {
@@ -37,43 +27,33 @@
                 });
                 video.srcObject = stream;
                 video.play();
-                document.getElementById('status').innerText = "Capturing! (Make sure to select the Roblox Window)";
-                
-                // Refresh loop
-                if(interval) clearInterval(interval);
-                interval = setInterval(processFrame, 100); // 10 FPS
-            } catch (err) {
-                console.error(err);
-            }
+                document.getElementById('status').innerText = "Status: CAPTURING (Running)";
+                setInterval(updateData, 100); // Send frame data every 100ms
+            } catch (err) { alert("Error: " + err); }
         }
 
-        function processFrame() {
-            const width = parseInt(document.getElementById('quality').value);
-            const height = Math.floor(width * 0.56); // 16:9 ratio
+        function updateData() {
+            // We use a small resolution so Roblox doesn't explode
+            const w = 40; // 320p scale
+            const h = 22;
+            canvas.width = w; canvas.height = h;
+            ctx.drawImage(video, 0, 0, w, h);
             
-            canvas.width = width;
-            canvas.height = height;
-            ctx.drawImage(video, 0, 0, width, height);
-
-            const imgData = ctx.getImageData(0, 0, width, height).data;
-            const pixels = [];
-
-            for (let y = 0; y < height; y++) {
-                const row = [];
-                for (let x = 0; x < width; x++) {
-                    const i = (y * width + x) * 4;
-                    row.push([imgData[i], imgData[i+1], imgData[i+2]]);
+            const pixels = ctx.getImageData(0, 0, w, h).data;
+            let frame = [];
+            for (let y = 0; y < h; y++) {
+                let row = [];
+                for (let x = 0; x < w; x++) {
+                    const i = (y * w + x) * 4;
+                    row.push([pixels[i], pixels[i+1], pixels[i+2]]);
                 }
-                pixels.push(row);
+                frame.push(row);
             }
-
-            // In a real setup, you would POST this to a local server or GitHub API.
-            // For executors, you can host a simple Node.js server to "serve" this JSON.
-            window.latestData = pixels;
+            // This is where you'd host the JSON. 
+            // For now, it logs to console. To make it work with GitHub, 
+            // you'd need a GitHub Token to auto-update a file (highly complex).
+            console.log(JSON.stringify(frame)); 
         }
-
-        // Simple local "server" simulation for the executor to fetch
-        // In a real scenario, you'd use a local Flask/Express server.
     </script>
 </body>
 </html>
