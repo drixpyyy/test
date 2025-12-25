@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Roblox Screen Capture Relay</title>
+    <style>
+        body { font-family: sans-serif; background: #222; color: #fff; text-align: center; }
+        canvas { border: 1px solid #555; background: #000; max-width: 100%; }
+        .controls { margin: 20px; }
+        button { padding: 10px; cursor: pointer; }
+        #status { color: #0f0; margin: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Roblox Screen to Parts Relay</h1>
+    <div class="controls">
+        <button onclick="startCapture()">1. Start Screen Capture</button>
+        <select id="quality">
+            <option value="20">140p (20px wide - Fastest)</option>
+            <option value="40">320p (40px wide)</option>
+            <option value="80">720p (80px wide - Laggy)</option>
+            <option value="120">1080p (120px wide - Max for Parts)</option>
+        </select>
+    </div>
+    <div id="status">Waiting...</div>
+    <canvas id="preview"></canvas>
+
+    <script>
+        const canvas = document.getElementById('preview');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        let video = document.createElement('video');
+        let interval;
+
+        async function startCapture() {
+            try {
+                const stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { displaySurface: "window" }
+                });
+                video.srcObject = stream;
+                video.play();
+                document.getElementById('status').innerText = "Capturing! (Make sure to select the Roblox Window)";
+                
+                // Refresh loop
+                if(interval) clearInterval(interval);
+                interval = setInterval(processFrame, 100); // 10 FPS
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function processFrame() {
+            const width = parseInt(document.getElementById('quality').value);
+            const height = Math.floor(width * 0.56); // 16:9 ratio
+            
+            canvas.width = width;
+            canvas.height = height;
+            ctx.drawImage(video, 0, 0, width, height);
+
+            const imgData = ctx.getImageData(0, 0, width, height).data;
+            const pixels = [];
+
+            for (let y = 0; y < height; y++) {
+                const row = [];
+                for (let x = 0; x < width; x++) {
+                    const i = (y * width + x) * 4;
+                    row.push([imgData[i], imgData[i+1], imgData[i+2]]);
+                }
+                pixels.push(row);
+            }
+
+            // In a real setup, you would POST this to a local server or GitHub API.
+            // For executors, you can host a simple Node.js server to "serve" this JSON.
+            window.latestData = pixels;
+        }
+
+        // Simple local "server" simulation for the executor to fetch
+        // In a real scenario, you'd use a local Flask/Express server.
+    </script>
+</body>
+</html>
