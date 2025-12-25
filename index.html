@@ -1,58 +1,75 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Roblox Screen Relay</title>
+    <title>GitHub Streamer</title>
     <style>
         body { background: #111; color: white; font-family: sans-serif; text-align: center; }
-        canvas { border: 2px solid #444; margin-top: 10px; background: #000; width: 400px; }
-        .status { color: #0f0; font-weight: bold; }
+        input, select, button { padding: 10px; margin: 5px; background: #222; color: #fff; border: 1px solid #555; }
+        #status { color: #0f0; }
     </style>
 </head>
 <body>
-    <h2>Roblox Screen Capture</h2>
-    <p>1. Click Start and select the <b>Roblox Window</b></p>
-    <button onclick="startCapture()" style="padding:10px 20px; cursor:pointer;">Start Capture</button>
-    <p id="status">Status: Waiting...</p>
-    <canvas id="prev"></canvas>
+    <h1>GitHub Screen Relay</h1>
+    <input type="password" id="token" placeholder="GitHub Personal Access Token">
+    <input type="text" id="repo" placeholder="username/repo_name">
+    <br>
+    <select id="quality">
+        <option value="20">140p (20px)</option>
+        <option value="40">320p (40px)</option>
+        <option value="80">720p (80px)</option>
+    </select>
+    <button onclick="start()">Start Stream</button>
+    <p id="status">Status: Idle</p>
 
     <script>
-        const canvas = document.getElementById('prev');
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
         let video = document.createElement('video');
+        let sha = ""; // Needed for GitHub API updates
 
-        async function startCapture() {
-            try {
-                const stream = await navigator.mediaDevices.getDisplayMedia({
-                    video: { displaySurface: "window" }
-                });
-                video.srcObject = stream;
-                video.play();
-                document.getElementById('status').innerText = "Status: CAPTURING (Running)";
-                setInterval(updateData, 100); // Send frame data every 100ms
-            } catch (err) { alert("Error: " + err); }
+        async function start() {
+            const stream = await navigator.mediaDevices.getDisplayMedia({video: true});
+            video.srcObject = stream; video.play();
+            document.getElementById('status').innerText = "Streaming... (Expect 1-3 min delay)";
+            setInterval(uploadFrame, 5000); // Only update every 5s to avoid GitHub ban
         }
 
-        function updateData() {
-            // We use a small resolution so Roblox doesn't explode
-            const w = 40; // 320p scale
-            const h = 22;
+        async function uploadFrame() {
+            const canvas = document.createElement('canvas');
+            const w = document.getElementById('quality').value;
+            const h = Math.floor(w * 0.56);
             canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
             ctx.drawImage(video, 0, 0, w, h);
+            const pix = ctx.getImageData(0,0,w,h).data;
             
-            const pixels = ctx.getImageData(0, 0, w, h).data;
             let frame = [];
-            for (let y = 0; y < h; y++) {
+            for(let y=0; y<h; y++) {
                 let row = [];
-                for (let x = 0; x < w; x++) {
-                    const i = (y * w + x) * 4;
-                    row.push([pixels[i], pixels[i+1], pixels[i+2]]);
+                for(let x=0; x<w; x++) {
+                    let i = (y*w+x)*4;
+                    row.push([pix[i], pix[i+1], pix[i+2]]);
                 }
                 frame.push(row);
             }
-            // This is where you'd host the JSON. 
-            // For now, it logs to console. To make it work with GitHub, 
-            // you'd need a GitHub Token to auto-update a file (highly complex).
-            console.log(JSON.stringify(frame)); 
+
+            const token = document.getElementById('token').value;
+            const repo = document.getElementById('repo').value;
+            const url = `https://api.github.com/repos/${repo}/contents/data.json`;
+
+            // Get current SHA to overwrite file
+            const getFile = await fetch(url, {headers: {Authorization: `token ${token}`}});
+            const fileData = await getFile.json();
+            sha = fileData.sha;
+
+            // Upload new data
+            fetch(url, {
+                method: "PUT",
+                headers: { Authorization: `token ${token}`, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    message: "update frame",
+                    content: btoa(JSON.stringify(frame)),
+                    sha: sha
+                })
+            });
         }
     </script>
 </body>
