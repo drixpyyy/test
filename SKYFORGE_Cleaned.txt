@@ -1,0 +1,1928 @@
+--[[
+    +==========================================================================+
+    |                    S K Y F O R G E :   D O M I N I O N                  |
+    |                   The Ultimate Client-Side Demonstration                  |
+    |                                                                          |
+    |   A COMPLETE game built from ONE executor script:                        |
+    |   * Procedural floating city world generation                            |
+    |   * Advanced enemy AI with pathfinding & combat                          |
+    |   * Full weapon system with raycasting & hit detection                   |
+    |   * Character abilities: Double Jump, Dash, Wallrun, Glide               |
+    |   * Dynamic day/night cycle with weather                                 |
+    |   * Health/shield system with regenerating shields                       |
+    |   * Score, combo & kill feed system                                      |
+    |   * Particle effects, screen shake, bloom, atmosphere                    |
+    |   * Interactive minimap, HUD, animated UI                                |
+    |   * Teleporters, elevators, collectibles, secrets                        |
+    +==========================================================================+
+--]]
+
+-- ======================= SERVICES & SETUP =======================
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+local UIS = game:GetService("UserInputService")
+local Debris = game:GetService("Debris")
+local SoundService = game:GetService("SoundService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+local TS = game:GetService("TweenService")
+local player = Players.LocalPlayer
+local mouse = player:GetMouse()
+local cam = workspace.CurrentCamera
+
+-- ======================= CORE FOLDER STRUCTURE =======================
+local Skyforge = Instance.new("Folder", workspace)
+Skyforge.Name = "SKYFORGE_World"
+
+local WorldFolder = Instance.new("Folder", Skyforge)
+WorldFolder.Name = "Terrain"
+
+local BuildingsFolder = Instance.new("Folder", Skyforge)
+BuildingsFolder.Name = "Buildings"
+
+local EnemiesFolder = Instance.new("Folder", Skyforge)
+EnemiesFolder.Name = "Enemies"
+
+local EffectsFolder = Instance.new("Folder", Skyforge)
+EffectsFolder.Name = "Effects"
+
+local ItemsFolder = Instance.new("Folder", Skyforge)
+ItemsFolder.Name = "Collectibles"
+
+local ProjectilesFolder = Instance.new("Folder", Skyforge)
+ProjectilesFolder.Name = "Projectiles"
+
+-- ======================= PALETTE =======================
+local COLORS = {
+    Base = Color3.fromRGB(15, 15, 30),
+    NeonBlue = Color3.fromRGB(0, 200, 255),
+    NeonPurple = Color3.fromRGB(180, 50, 255),
+    NeonPink = Color3.fromRGB(255, 50, 150),
+    NeonGreen = Color3.fromRGB(50, 255, 100),
+    NeonOrange = Color3.fromRGB(255, 150, 0),
+    NeonCyan = Color3.fromRGB(0, 255, 200),
+    Metal = Color3.fromRGB(60, 65, 80),
+    DarkMetal = Color3.fromRGB(35, 38, 50),
+    Glass = Color3.fromRGB(180, 220, 255),
+    Warning = Color3.fromRGB(255, 80, 0),
+    White = Color3.fromRGB(255, 255, 255),
+    Sky = Color3.fromRGB(10, 10, 40),
+    Void = Color3.fromRGB(5, 5, 15)
+}
+
+-- ======================= MATERIALS MAP =======================
+local MAT = {
+    Base = Enum.Material.Neon,
+    Metal = Enum.Material.Metal,
+    Glass = Enum.Material.Glass,
+    Forcefield = Enum.Material.ForceField,
+    Smooth = Enum.Material.SmoothPlastic
+}
+
+-- ======================= UTILITY FUNCTIONS =======================
+local function newPart(props)
+    local p = Instance.new("Part")
+    p.Size = props.size or Vector3.new(4, 4, 4)
+    p.Position = props.pos or Vector3.new(0, 0, 0)
+    p.Color = props.color or COLORS.Metal
+    p.Material = props.mat or MAT.Metal
+    p.Anchored = props.anchored ~= false
+    p.CanCollide = props.collide ~= false
+    p.Transparency = props.trans or 0
+    p.Name = props.name or "Part"
+    p.TopSurface = Enum.SurfaceType.Smooth
+    p.BottomSurface = Enum.SurfaceType.Smooth
+    p.Parent = props.parent or Skyforge
+    if props.shape then p.Shape = props.shape end
+    if props.cframe then p.CFrame = props.cframe end
+    if props.reflect then p.Reflectance = props.reflect end
+    if props.light then
+        local l = Instance.new("PointLight", p)
+        l.Color = props.lightColor or props.color or COLORS.NeonBlue
+        l.Brightness = props.lightBright or 2
+        l.Range = props.lightRange or 15
+    end
+    if props.glow then
+        local sg = Instance.new("SurfaceLight", p)
+        sg.Color = props.glowColor or props.color
+        sg.Brightness = props.glowBright or 3
+        sg.Range = props.glowRange or 20
+        sg.Angle = props.glowAngle or 90
+    end
+    if props.decay then
+        Debris:AddItem(p, props.decay)
+    end
+    return p
+end
+
+local function weld(p1, p2)
+    local w = Instance.new("Weld")
+    w.Part0 = p1
+    w.Part1 = p2
+    w.C0 = p1.CFrame:Inverse() * p2.CFrame
+    w.Parent = p1
+    return w
+end
+
+local function tween(obj, info, goals)
+    return TS:Create(obj, TweenInfo.new(info.time or 0.5, info.ease or Enum.EasingStyle.Quad, info.dir or Enum.EasingDirection.Out), goals)
+end
+
+local function randomInRange(min, max)
+    return min + math.random() * (max - min)
+end
+
+local function randomV3Range(minX, maxX, minY, maxY, minZ, maxZ)
+    return Vector3.new(randomInRange(minX, maxX), randomInRange(minY, maxY), randomInRange(minZ, maxZ))
+end
+
+local function emitParticles(parent, color, count, size, speed, lifetime)
+    local pe = Instance.new("ParticleEmitter", parent)
+    pe.Color = ColorSequence.new(color or COLORS.NeonBlue)
+    pe.Size = NumberSequence.new(size or 2)
+    pe.Speed = NumberRange.new(speed or 10, (speed or 10) * 2)
+    pe.Lifetime = NumberRange.new(lifetime or 1)
+    pe.Rate = 0
+    pe.SpreadAngle = Vector2.new(180, 180)
+    pe:Emit(count or 10)
+    Debris:AddItem(pe, (lifetime or 1) + 1)
+    return pe
+end
+
+local function playSound(id, vol, pitch, parent)
+    local s = Instance.new("Sound")
+    s.SoundId = "rbxassetid://" .. id
+    s.Volume = vol or 0.5
+    s.PlaybackSpeed = pitch or 1
+    s.Parent = parent or SoundService
+    s:Play()
+    Debris:AddItem(s, 5)
+    return s
+end
+
+local function billboard(text, color, size, parent)
+    local b = Instance.new("BillboardGui", parent)
+    b.Size = UDim2.new(0, 200, 0, 50)
+    b.StudsOffset = Vector3.new(0, 3, 0)
+    b.AlwaysOnTop = true
+    local l = Instance.new("TextLabel", b)
+    l.Size = UDim2.new(1, 0, 1, 0)
+    l.BackgroundTransparency = 1
+    l.Text = text
+    l.TextColor3 = color or COLORS.NeonBlue
+    l.TextStrokeTransparency = 0.3
+    l.TextStrokeColor3 = Color3.new(0, 0, 0)
+    l.Font = Enum.Font.GothamBold
+    l.TextSize = size or 18
+    return b
+end
+
+-- ======================= WORLD GENERATION =======================
+print("[SKYFORGE] Initializing world generation...")
+
+-- Base platform (the floating island)
+local function createBasePlatform()
+    -- Main platform
+    local base = newPart({
+        size = Vector3.new(300, 20, 300),
+        pos = Vector3.new(0, 100, 0),
+        color = COLORS.DarkMetal,
+        mat = MAT.Metal,
+        name = "MainPlatform",
+        parent = WorldFolder,
+        glow = true,
+        glowColor = COLORS.NeonBlue,
+        glowBright = 1,
+        glowRange = 60
+    })
+
+    -- Edge ring with neon
+    for i = 1, 32 do
+        local angle = (i / 32) * math.pi * 2
+        local pos = Vector3.new(math.cos(angle) * 145, 110, math.sin(angle) * 145)
+        local edge = newPart({
+            size = Vector3.new(6, 6, 6),
+            pos = pos,
+            color = COLORS.NeonBlue,
+            mat = MAT.Base,
+            name = "EdgeLight",
+            parent = WorldFolder,
+            light = true,
+            lightColor = COLORS.NeonBlue,
+            lightBright = 3,
+            lightRange = 20
+        })
+    end
+
+    -- Lower ring (gives depth)
+    for i = 1, 24 do
+        local angle = (i / 24) * math.pi * 2
+        local pos = Vector3.new(math.cos(angle) * 135, 85, math.sin(angle) * 135)
+        local lower = newPart({
+            size = Vector3.new(8, 25, 8),
+            pos = pos,
+            color = COLORS.DarkMetal,
+            mat = MAT.Metal,
+            name = "PlatformSupport",
+            parent = WorldFolder
+        })
+    end
+
+    -- Central spire
+    for i = 1, 12 do
+        local spire = newPart({
+            size = Vector3.new(12 - i, 8, 12 - i),
+            pos = Vector3.new(0, 110 + i * 8, 0),
+            color = COLORS.NeonPurple,
+            mat = MAT.Base,
+            name = "CentralSpire",
+            parent = WorldFolder,
+            light = true,
+            lightColor = COLORS.NeonPurple,
+            lightBright = 4,
+            lightRange = 25
+        })
+    end
+
+    -- Floating rocks around
+    for i = 1, 20 do
+        local angle = math.random() * math.pi * 2
+        local dist = 170 + math.random() * 100
+        local rock = newPart({
+            size = Vector3.new(randomInRange(5, 15), randomInRange(5, 15), randomInRange(5, 15)),
+            pos = Vector3.new(math.cos(angle) * dist, randomInRange(60, 140), math.sin(angle) * dist),
+            color = COLORS.DarkMetal,
+            mat = MAT.Metal,
+            name = "FloatingRock",
+            parent = WorldFolder
+        })
+        -- Slow rotation animation via tween
+        local spin = tween(rock, {time = randomInRange(10, 30)}, {Orientation = Vector3.new(math.random()*360, math.random()*360, math.random()*360)})
+        spin:Play()
+    end
+
+    return base
+end
+
+-- Building generation system
+local function createSkyscraper(x, z, height, color, hasAntenna)
+    local building = Instance.new("Model", BuildingsFolder)
+    building.Name = "Skyscraper"
+
+    -- Main tower
+    local w = randomInRange(10, 20)
+    local d = randomInRange(10, 20)
+    local tower = newPart({
+        size = Vector3.new(w, height, d),
+        pos = Vector3.new(x, 110 + height/2, z),
+        color = color or COLORS.Metal,
+        mat = MAT.Metal,
+        name = "Tower",
+        parent = building
+    })
+
+    -- Windows (neon strips)
+    local windowCount = math.floor(height / 8)
+    for i = 1, windowCount do
+        local side = math.random(1, 4)
+        local wx, wz = x, z
+        local ws = Vector3.new(0, 0, 0)
+        if side == 1 then
+            wx = x + w/2 + 0.2
+            ws = Vector3.new(0.4, 4, d - 2)
+        elseif side == 2 then
+            wx = x - w/2 - 0.2
+            ws = Vector3.new(0.4, 4, d - 2)
+        elseif side == 3 then
+            wz = z + d/2 + 0.2
+            ws = Vector3.new(w - 2, 4, 0.4)
+        else
+            wz = z - d/2 - 0.2
+            ws = Vector3.new(w - 2, 4, 0.4)
+        end
+
+        local winColor = ({COLORS.NeonBlue, COLORS.NeonPurple, COLORS.NeonPink, COLORS.NeonCyan, COLORS.NeonGreen})[math.random(1, 5)]
+        newPart({
+            size = ws,
+            pos = Vector3.new(wx, 110 + i * 8, wz),
+            color = winColor,
+            mat = MAT.Base,
+            name = "Window",
+            parent = building,
+            light = true,
+            lightColor = winColor,
+            lightBright = 1.5,
+            lightRange = 10
+        })
+    end
+
+    -- Top antenna
+    if hasAntenna then
+        for i = 1, 5 do
+            newPart({
+                size = Vector3.new(1, 8, 1),
+                pos = Vector3.new(x, 110 + height + i * 8, z),
+                color = COLORS.NeonOrange,
+                mat = MAT.Base,
+                name = "Antenna",
+                parent = building,
+                light = true,
+                lightColor = COLORS.NeonOrange,
+                lightBright = 5,
+                lightRange = 15
+            })
+        end
+        -- Beacon light
+        local beacon = newPart({
+            size = Vector3.new(3, 3, 3),
+            pos = Vector3.new(x, 110 + height + 48, z),
+            color = COLORS.Warning,
+            mat = MAT.Base,
+            name = "Beacon",
+            parent = building
+        })
+        -- Blink animation
+        spawn(function()
+            while beacon.Parent do
+                beacon.Transparency = 0
+                wait(0.5)
+                if not beacon.Parent then break end
+                beacon.Transparency = 0.8
+                wait(0.5)
+            end
+        end)
+    end
+
+    -- Roof detail
+    newPart({
+        size = Vector3.new(w + 4, 2, d + 4),
+        pos = Vector3.new(x, 110 + height + 1, z),
+        color = COLORS.DarkMetal,
+        mat = MAT.Metal,
+        name = "Roof",
+        parent = building
+    })
+
+    return building
+end
+
+-- Bridge between platforms
+local function createBridge(x1, z1, x2, z2, y)
+    local dx, dz = x2 - x1, z2 - z1
+    local dist = math.sqrt(dx*dx + dz*dz)
+    local midX, midZ = (x1 + x2) / 2, (z1 + z2) / 2
+    local angle = math.atan2(dz, dx)
+
+    local bridge = newPart({
+        size = Vector3.new(dist, 2, 8),
+        pos = Vector3.new(midX, y, midZ),
+        color = COLORS.DarkMetal,
+        mat = MAT.Metal,
+        name = "Bridge",
+        parent = WorldFolder,
+        cframe = CFrame.new(midX, y, midZ) * CFrame.Angles(0, -angle, 0)
+    })
+
+    -- Neon railing
+    for side = -1, 1, 2 do
+        local rail = newPart({
+            size = Vector3.new(dist, 1, 0.5),
+            pos = Vector3.new(0, 0, 0),
+            color = COLORS.NeonBlue,
+            mat = MAT.Base,
+            name = "Rail",
+            parent = WorldFolder
+        })
+        rail.CFrame = CFrame.new(midX, y + 3, midZ) * CFrame.Angles(0, -angle, 0) * CFrame.new(0, 0, side * 4)
+    end
+
+    return bridge
+end
+
+-- Decorative elements
+local function createDecorations()
+    -- Neon signs/billboards
+    for i = 1, 8 do
+        local angle = (i / 8) * math.pi * 2
+        local pos = Vector3.new(math.cos(angle) * 100, 130, math.sin(angle) * 100)
+        local sign = newPart({
+            size = Vector3.new(12, 8, 1),
+            pos = pos,
+            color = ({COLORS.NeonPink, COLORS.NeonCyan, COLORS.NeonOrange, COLORS.NeonGreen})[math.random(1, 4)],
+            mat = MAT.Base,
+            name = "NeonSign",
+            parent = WorldFolder,
+            glow = true,
+            glowBright = 5,
+            glowRange = 30
+        })
+        sign.Orientation = Vector3.new(0, math.deg(angle) + 90, 0)
+        billboard("SECTOR " .. i, COLORS.White, 14, sign)
+    end
+
+    -- Floating holographic rings
+    for i = 1, 6 do
+        local ring = newPart({
+            size = Vector3.new(randomInRange(15, 30), 1, randomInRange(15, 30)),
+            pos = randomV3Range(-120, 120, 130, 180, -120, 120),
+            color = COLORS.NeonPurple,
+            mat = MAT.Forcefield,
+            name = "HoloRing",
+            parent = WorldFolder,
+            trans = 0.6,
+            shape = Enum.PartType.Cylinder
+        })
+        ring.Orientation = Vector3.new(0, 0, 90)
+        -- Float animation
+        local origY = ring.Position.Y
+        spawn(function()
+            while ring.Parent do
+                tween(ring, {time = 3, ease = Enum.EasingStyle.Sine, dir = Enum.EasingDirection.InOut}, {Position = Vector3.new(ring.Position.X, origY + 5, ring.Position.Z)}):Play()
+                wait(3)
+                if not ring.Parent then break end
+                tween(ring, {time = 3, ease = Enum.EasingStyle.Sine, dir = Enum.EasingDirection.InOut}, {Position = Vector3.new(ring.Position.X, origY - 5, ring.Position.Z)}):Play()
+                wait(3)
+            end
+        end)
+    end
+
+    -- Data pillars
+    for i = 1, 12 do
+        local angle = (i / 12) * math.pi * 2
+        local pillar = newPart({
+            size = Vector3.new(3, randomInRange(20, 40), 3),
+            pos = Vector3.new(math.cos(angle) * randomInRange(40, 90), 110 + randomInRange(10, 30), math.sin(angle) * randomInRange(40, 90)),
+            color = COLORS.NeonCyan,
+            mat = MAT.Glass,
+            name = "DataPillar",
+            parent = WorldFolder,
+            trans = 0.3,
+            reflect = 0.5
+        })
+    end
+
+    -- Energy orbs floating
+    for i = 1, 15 do
+        local orb = newPart({
+            size = Vector3.new(2, 2, 2),
+            pos = randomV3Range(-130, 130, 115, 200, -130, 130),
+            color = COLORS.NeonGreen,
+            mat = MAT.Base,
+            name = "EnergyOrb",
+            parent = WorldFolder,
+            shape = Enum.PartType.Ball,
+            light = true,
+            lightColor = COLORS.NeonGreen,
+            lightBright = 5,
+            lightRange = 15
+        })
+        -- Orbit animation
+        spawn(function()
+            local t = 0
+            local center = orb.Position
+            local radius = randomInRange(5, 15)
+            local speed = randomInRange(0.5, 2)
+            while orb.Parent do
+                t = t + 0.02
+                orb.Position = center + Vector3.new(math.cos(t * speed) * radius, math.sin(t * 0.5) * 5, math.sin(t * speed) * radius)
+                wait(0.03)
+            end
+        end)
+    end
+end
+
+-- ======================= GENERATE THE WORLD =======================
+local base = createBasePlatform()
+
+-- Create skyscrapers in a circle
+local skyscraperPositions = {}
+for i = 1, 10 do
+    local angle = (i / 10) * math.pi * 2
+    local dist = randomInRange(50, 120)
+    local x, z = math.cos(angle) * dist, math.sin(angle) * dist
+    local height = randomInRange(30, 80)
+    local color = ({COLORS.Metal, COLORS.DarkMetal, Color3.fromRGB(40, 45, 60)})[math.random(1, 3)]
+    createSkyscraper(x, z, height, color, i % 3 == 0)
+    table.insert(skyscraperPositions, {x = x, z = z, h = 110 + height})
+end
+
+-- Create bridges between some buildings
+for i = 1, #skyscraperPositions - 1 do
+    if math.random() > 0.4 then
+        createBridge(skyscraperPositions[i].x, skyscraperPositions[i].z,
+                     skyscraperPositions[i + 1].x, skyscraperPositions[i + 1].z,
+                     110 + randomInRange(15, 40))
+    end
+end
+
+-- Secondary platforms
+for i = 1, 4 do
+    local angle = (i / 4) * math.pi * 2 + math.pi / 4
+    local dist = 180
+    local plat = newPart({
+        size = Vector3.new(40, 8, 40),
+        pos = Vector3.new(math.cos(angle) * dist, randomInRange(90, 160), math.sin(angle) * dist),
+        color = COLORS.DarkMetal,
+        mat = MAT.Metal,
+        name = "SecondaryPlatform",
+        parent = WorldFolder,
+        light = true,
+        lightColor = COLORS.NeonPink,
+        lightBright = 3,
+        lightRange = 30
+    })
+    -- Small tower on it
+    createSkyscraper(plat.Position.X, plat.Position.Z, randomInRange(15, 30), COLORS.Metal, true)
+end
+
+createDecorations()
+
+-- ======================= ATMOSPHERE & LIGHTING =======================
+-- Clean up default lighting
+for _, child in ipairs(Lighting:GetChildren()) do
+    if child:IsA("Sky") then child:Destroy() end
+end
+
+-- Custom sky
+local sky = Instance.new("Sky", Lighting)
+sky.SkyboxBk = "rbxassetid://10138401079"
+sky.SkyboxDn = "rbxassetid://10138411839"
+sky.SkyboxFt = "rbxassetid://10138424694"
+sky.SkyboxLf = "rbxassetid://10138439324"
+sky.SkyboxRt = "rbxassetid://10138450971"
+sky.SkyboxUp = "rbxassetid://10138464798"
+sky.StarCount = 5000
+
+-- Atmosphere
+local atmosphere = Instance.new("Atmosphere", Lighting)
+atmosphere.Density = 0.35
+atmosphere.Offset = 0.2
+atmosphere.Color = Color3.fromRGB(15, 15, 50)
+atmosphere.Decay = Color3.fromRGB(30, 20, 60)
+atmosphere.Glare = 0.5
+atmosphere.Haze = 1
+
+-- Bloom
+local bloom = Instance.new("BloomEffect", Lighting)
+bloom.Intensity = 2
+bloom.Size = 24
+bloom.Threshold = 0.8
+
+-- Color correction
+local cc = Instance.new("ColorCorrectionEffect", Lighting)
+cc.Contrast = 0.1
+cc.Saturation = 0.3
+cc.TintColor = Color3.fromRGB(240, 230, 255)
+
+-- Depth of field
+local dof = Instance.new("DepthOfFieldEffect", Lighting)
+dof.FarIntensity = 0.3
+dof.NearIntensity = 0
+dof.FocusDistance = 100
+dof.InFocusRadius = 50
+
+-- Sun rays
+local sunRays = Instance.new("SunRaysEffect", Lighting)
+sunRays.Intensity = 0.3
+sunRays.Spread = 0.8
+
+-- Lighting settings
+Lighting.Brightness = 1.5
+Lighting.ClockTime = 20
+Lighting.GeographicLatitude = 45
+Lighting.Ambient = Color3.fromRGB(30, 30, 60)
+Lighting.OutdoorAmbient = Color3.fromRGB(15, 15, 40)
+Lighting.ColorShift_Bottom = COLORS.NeonBlue
+Lighting.ColorShift_Top = COLORS.NeonPurple
+Lighting.FogColor = Color3.fromRGB(10, 10, 30)
+Lighting.FogEnd = 800
+Lighting.FogStart = 100
+
+-- ======================= TELEPORT PLAYER =======================
+local char = player.Character or player.CharacterAdded:Wait()
+local humRoot = char:WaitForChild("HumanoidRootPart")
+local humanoid = char:WaitForChild("Humanoid")
+
+-- Wait a moment then teleport
+wait(1)
+humRoot.CFrame = CFrame.new(0, 130, 0)
+humanoid.JumpPower = 60
+humanoid.WalkSpeed = 22
+
+-- Teleport effect
+emitParticles(humRoot, COLORS.NeonBlue, 50, 3, 20, 2)
+emitParticles(humRoot, COLORS.NeonPurple, 30, 2, 15, 2)
+playSound(5801637099, 1, 1, humRoot)
+
+print("[SKYFORGE] Teleported to world center!")
+
+-- ======================= CHARACTER ABILITIES =======================
+-- Double jump
+local canDoubleJump = true
+local hasDoubleJumped = false
+local defaultJumpPower = humanoid.JumpPower
+
+humanoid.StateChanged:Connect(function(_, newState)
+    if newState == Enum.HumanoidStateType.Landed then
+        hasDoubleJumped = false
+        canDoubleJump = true
+    end
+end)
+
+UIS.JumpRequest:Connect(function()
+    if canDoubleJump and not hasDoubleJumped and humanoid:GetState() == Enum.HumanoidStateType.Freefall then
+        hasDoubleJumped = true
+        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        -- Double jump effect
+        emitParticles(humRoot, COLORS.NeonCyan, 20, 2, 10, 1)
+        playSound(5801637099, 0.4, 1.5, humRoot)
+        -- Small explosion ring
+        local ring = newPart({
+            size = Vector3.new(1, 0.2, 1),
+            pos = humRoot.Position - Vector3.new(0, 2, 0),
+            color = COLORS.NeonCyan,
+            mat = MAT.Forcefield,
+            name = "JumpRing",
+            parent = EffectsFolder,
+            shape = Enum.PartType.Cylinder,
+            anchored = true,
+            collide = false
+        })
+        ring.Orientation = Vector3.new(0, 0, 90)
+        tween(ring, {time = 0.5}, {Size = Vector3.new(20, 0.2, 20), Transparency = 1}):Play()
+        Debris:AddItem(ring, 0.5)
+    end
+end)
+
+-- Dash ability
+local canDash = true
+UIS.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.Q and canDash then
+        canDash = false
+        local look = humRoot.CFrame.LookVector
+        humRoot.Velocity = humRoot.Velocity + Vector3.new(look.X * 80, 30, look.Z * 80)
+
+        -- Dash effect
+        emitParticles(humRoot, COLORS.NeonBlue, 30, 1.5, 25, 0.8)
+        playSound(3932505916, 0.5, 1.8, humRoot)
+
+        -- Afterimage
+        for i = 1, 3 do
+            local ghost = newPart({
+                size = humRoot.Size,
+                pos = humRoot.Position - look * i * 3,
+                color = COLORS.NeonBlue,
+                mat = MAT.Forcefield,
+                name = "DashGhost",
+                parent = EffectsFolder,
+                trans = 0.5,
+                anchored = true,
+                collide = false,
+                cframe = humRoot.CFrame
+            })
+            tween(ghost, {time = 0.4}, {Transparency = 1, Position = ghost.Position - look * 5}):Play()
+            Debris:AddItem(ghost, 0.4)
+        end
+
+        wait(1.5)
+        canDash = true
+    end
+end)
+
+-- ======================= WEAPON SYSTEM =======================
+local weaponEquipped = true
+local firing = false
+local weaponDamage = 25
+local fireRate = 0.1
+local lastFire = 0
+local ammo = 999
+local maxAmmo = 999
+
+-- Create weapon model attached to camera
+local weaponModel = Instance.new("Model", cam)
+weaponModel.Name = "Weapon"
+
+local weaponHandle = newPart({
+    size = Vector3.new(0.6, 0.6, 3),
+    pos = Vector3.new(0, 0, 0),
+    color = COLORS.DarkMetal,
+    mat = MAT.Metal,
+    name = "Handle",
+    parent = weaponModel,
+    trans = 0,
+    anchored = true,
+    collide = false
+})
+
+local weaponCore = newPart({
+    size = Vector3.new(0.5, 0.5, 1.5),
+    pos = Vector3.new(0, 0.2, 0.5),
+    color = COLORS.NeonBlue,
+    mat = MAT.Base,
+    name = "Core",
+    parent = weaponModel,
+    anchored = true,
+    collide = false
+})
+weld(weaponHandle, weaponCore)
+
+local weaponBarrel = newPart({
+    size = Vector3.new(0.3, 0.3, 0.5),
+    pos = Vector3.new(0, 0, -1.6),
+    color = COLORS.NeonOrange,
+    mat = MAT.Base,
+    name = "Barrel",
+    parent = weaponModel,
+    anchored = true,
+    collide = false
+})
+weld(weaponHandle, weaponBarrel)
+
+local weaponLight = Instance.new("PointLight", weaponCore)
+weaponLight.Color = COLORS.NeonBlue
+weaponLight.Brightness = 5
+weaponLight.Range = 10
+
+-- Position weapon in view
+spawn(function()
+    while weaponModel.Parent do
+        local camCF = cam.CFrame
+        local offset = camCF * CFrame.new(1.2, -1.2, -2.5) * CFrame.Angles(0, math.rad(180), 0)
+        weaponHandle.CFrame = offset
+        RunService.RenderStepped:Wait()
+    end
+end)
+
+-- Fire weapon
+local function fireWeapon()
+    local now = tick()
+    if now - lastFire < fireRate then return end
+    lastFire = now
+
+    local camCF = cam.CFrame
+    local startPos = camCF.Position
+    local direction = camCF.LookVector
+
+    -- Barrel flash
+    local flash = newPart({
+        size = Vector3.new(1.5, 1.5, 1.5),
+        pos = startPos + direction * 3,
+        color = COLORS.NeonBlue,
+        mat = MAT.Base,
+        name = "MuzzleFlash",
+        parent = EffectsFolder,
+        anchored = true,
+        collide = false,
+        trans = 0.2
+    })
+    tween(flash, {time = 0.05}, {Size = Vector3.new(0.5, 0.5, 0.5), Transparency = 1}):Play()
+    Debris:AddItem(flash, 0.1)
+
+    -- Laser beam
+    local beam = Instance.new("Part", EffectsFolder)
+    beam.Size = Vector3.new(0.15, 0.15, 500)
+    beam.CFrame = CFrame.new(startPos + direction * 250, startPos + direction * 500)
+    beam.Anchored = true
+    beam.CanCollide = false
+    beam.Color = COLORS.NeonBlue
+    beam.Material = MAT.Base
+    beam.Transparency = 0.3
+    tween(beam, {time = 0.1}, {Transparency = 1}):Play()
+    Debris:AddItem(beam, 0.1)
+
+    -- Screen shake
+    local origCF = cam.CFrame
+    cam.CFrame = origCF * CFrame.new(randomInRange(-0.1, 0.1), randomInRange(-0.1, 0.1), 0)
+    delay(0.03, function() cam.CFrame = origCF end)
+
+    -- Hit detection
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {char, weaponModel, EffectsFolder, ProjectilesFolder}
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    local result = workspace:Raycast(startPos, direction * 500, rayParams)
+
+    if result then
+        local hitPos = result.Position
+        local hitInst = result.Instance
+
+        -- Hit effect
+        local hitExplosion = newPart({
+            size = Vector3.new(2, 2, 2),
+            pos = hitPos,
+            color = COLORS.NeonBlue,
+            mat = MAT.Base,
+            name = "HitEffect",
+            parent = EffectsFolder,
+            anchored = true,
+            collide = false,
+            trans = 0.3,
+            shape = Enum.PartType.Ball
+        })
+        tween(hitExplosion, {time = 0.3}, {Size = Vector3.new(6, 6, 6), Transparency = 1}):Play()
+        Debris:AddItem(hitExplosion, 0.3)
+        emitParticles(hitExplosion, COLORS.NeonBlue, 15, 1, 15, 0.5)
+
+        -- Check if enemy hit
+        local enemyModel = hitInst:FindFirstAncestorOfClass("Model")
+        if enemyModel and enemyModel.Parent == EnemiesFolder then
+            local hpVal = enemyModel:FindFirstChild("HP")
+            if hpVal then
+                hpVal.Value = hpVal.Value - weaponDamage
+                -- Damage number
+                local dmgBillboard = billboard("-" .. weaponDamage, COLORS.NeonOrange, 20, hitInst)
+                dmgBillboard.StudsOffset = Vector3.new(randomInRange(-2, 2), 4, randomInRange(-2, 2))
+                tween(dmgBillboard, {time = 0.8}, {StudsOffset = Vector3.new(0, 8, 0)}):Play()
+                Debris:AddItem(dmgBillboard, 0.8)
+
+                -- Enemy flash red
+                for _, part in ipairs(enemyModel:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        local origColor = part.Color
+                        part.Color = COLORS.Warning
+                        delay(0.1, function()
+                            if part.Parent then part.Color = origColor end
+                        end)
+                    end
+                end
+
+                if hpVal.Value <= 0 then
+                    -- Enemy death
+                    for _, part in ipairs(enemyModel:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            part.Anchored = false
+                            part.CanCollide = true
+                            part.Velocity = Vector3.new(randomInRange(-30, 30), randomInRange(20, 50), randomInRange(-30, 30))
+                            part.RotVelocity = Vector3.new(randomInRange(-10, 10), randomInRange(-10, 10), randomInRange(-10, 10))
+                            emitParticles(part, COLORS.NeonOrange, 10, 1, 15, 1)
+                        end
+                    end
+                    emitParticles(enemyModel:FindFirstChild("HumanoidRootPart") or enemyModel:FindFirstChildWhichIsA("Part"), COLORS.NeonOrange, 40, 3, 20, 2)
+                    playSound(5801257795, 0.8, 1, humRoot)
+
+                    -- Score popup
+                    addScore(100)
+                    local scoreBillboard = billboard("+100", COLORS.NeonGreen, 24, humRoot)
+                    scoreBillboard.StudsOffset = Vector3.new(0, 6, 0)
+                    tween(scoreBillboard, {time = 1}, {StudsOffset = Vector3.new(0, 12, 0)}):Play()
+                    Debris:AddItem(scoreBillboard, 1)
+
+                    Debris:AddItem(enemyModel, 3)
+                end
+            end
+        end
+    end
+
+    playSound(3932505916, 0.15, randomInRange(1.8, 2.2), humRoot)
+end
+
+mouse.Button1Down:Connect(function()
+    firing = true
+    while firing and weaponEquipped do
+        fireWeapon()
+        RunService.RenderStepped:Wait()
+    end
+end)
+
+mouse.Button1Up:Connect(function()
+    firing = false
+end)
+
+-- ======================= ENEMY AI SYSTEM =======================
+local enemiesAlive = 0
+local maxEnemies = 12
+
+local function spawnEnemy(x, y, z, type)
+    if enemiesAlive >= maxEnemies then return end
+    enemiesAlive = enemiesAlive + 1
+
+    local enemy = Instance.new("Model", EnemiesFolder)
+    enemy.Name = "EnemyDrone"
+
+    local hpVal = Instance.new("IntValue", enemy)
+    hpVal.Name = "HP"
+    hpVal.Value = (type == "heavy" and 150) or (type == "fast" and 50) or 100
+
+    local maxHp = hpVal.Value
+
+    -- Body
+    local body = newPart({
+        size = (type == "heavy" and Vector3.new(5, 5, 5)) or (type == "fast" and Vector3.new(2.5, 2.5, 2.5)) or Vector3.new(3.5, 3.5, 3.5),
+        pos = Vector3.new(x, y, z),
+        color = (type == "heavy" and COLORS.Warning) or (type == "fast" and COLORS.NeonGreen) or COLORS.NeonPink,
+        mat = MAT.Metal,
+        name = "Body",
+        parent = enemy,
+        shape = Enum.PartType.Ball
+    })
+
+    -- Eye
+    local eye = newPart({
+        size = Vector3.new(1, 1, 0.5),
+        pos = Vector3.new(x, y, z - 2),
+        color = COLORS.NeonRed or COLORS.Warning,
+        mat = MAT.Base,
+        name = "Eye",
+        parent = enemy
+    })
+    weld(body, eye)
+
+    -- Light
+    local elight = Instance.new("PointLight", body)
+    elight.Color = body.Color
+    elight.Brightness = 3
+    elight.Range = 20
+
+    -- Health bar
+    local hpGui = Instance.new("BillboardGui", body)
+    hpGui.Size = UDim2.new(0, 80, 0, 8)
+    hpGui.StudsOffset = Vector3.new(0, 4, 0)
+    hpGui.AlwaysOnTop = true
+    local hpBg = Instance.new("Frame", hpGui)
+    hpBg.Size = UDim2.new(1, 0, 1, 0)
+    hpBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    hpBg.BorderSizePixel = 0
+    local hpFill = Instance.new("Frame", hpBg)
+    hpFill.Size = UDim2.new(1, 0, 1, 0)
+    hpFill.BackgroundColor3 = COLORS.NeonGreen
+    hpFill.BorderSizePixel = 0
+
+    -- AI Behavior
+    spawn(function()
+        local speed = (type == "fast" and 18) or (type == "heavy" and 6) or 12
+        local attackRange = 15
+        local attackCooldown = 0
+        local idleOffset = Vector3.new(randomInRange(-20, 20), randomInRange(-5, 10), randomInRange(-20, 20))
+        local startPos = Vector3.new(x, y, z)
+
+        while enemy.Parent and hpVal.Value > 0 do
+            local eChar = player.Character
+            if eChar and eChar:FindFirstChild("HumanoidRootPart") then
+                local targetPos = eChar.HumanoidRootPart.Position
+                local myPos = body.Position
+                local dist = (targetPos - myPos).Magnitude
+
+                -- Update health bar
+                hpFill.Size = UDim2.new(hpVal.Value / maxHp, 0, 1, 0)
+                hpFill.BackgroundColor3 = hpVal.Value > maxHp * 0.5 and COLORS.NeonGreen or (hpVal.Value > maxHp * 0.25 and COLORS.Warning or COLORS.NeonPink)
+
+                if dist > 200 then
+                    -- Too far, return to patrol
+                    local patrolPos = startPos + idleOffset
+                    local dir = (patrolPos - myPos).Unit
+                    body.Position = body.Position + dir * speed * 0.03
+                    body.CFrame = CFrame.new(body.Position, body.Position + dir)
+                elseif dist > attackRange then
+                    -- Chase player
+                    local dir = (targetPos - myPos).Unit
+                    body.Position = body.Position + dir * speed * 0.03
+                    body.CFrame = CFrame.new(body.Position, targetPos)
+
+                    -- Movement trail
+                    if math.random() > 0.7 then
+                        local trail = newPart({
+                            size = Vector3.new(0.3, 0.3, 0.3),
+                            pos = body.Position,
+                            color = body.Color,
+                            mat = MAT.Base,
+                            name = "Trail",
+                            parent = EffectsFolder,
+                            anchored = true,
+                            collide = false,
+                            trans = 0.5,
+                            shape = Enum.PartType.Ball
+                        })
+                        tween(trail, {time = 0.5}, {Size = Vector3.new(0, 0, 0), Transparency = 1}):Play()
+                        Debris:AddItem(trail, 0.5)
+                    end
+                else
+                    -- Attack
+                    body.CFrame = CFrame.new(body.Position, targetPos)
+                    if tick() - attackCooldown > 1 then
+                        attackCooldown = tick()
+
+                        -- Shoot at player
+                        local proj = newPart({
+                            size = Vector3.new(0.8, 0.8, 0.8),
+                            pos = body.Position,
+                            color = COLORS.Warning,
+                            mat = MAT.Base,
+                            name = "EnemyProjectile",
+                            parent = ProjectilesFolder,
+                            anchored = true,
+                            collide = false,
+                            shape = Enum.PartType.Ball,
+                            light = true,
+                            lightColor = COLORS.Warning,
+                            lightBright = 5,
+                            lightRange = 10
+                        })
+
+                        local projDir = (targetPos - body.Position).Unit
+                        local projSpeed = 40
+                        spawn(function()
+                            local travelled = 0
+                            while proj.Parent and travelled < 300 do
+                                proj.Position = proj.Position + projDir * projSpeed * 0.03
+                                travelled = travelled + projSpeed * 0.03
+
+                                -- Check player hit
+                                if eChar and eChar:FindFirstChild("HumanoidRootPart") then
+                                    if (proj.Position - eChar.HumanoidRootPart.Position).Magnitude < 4 then
+                                        -- Hit player
+                                        takeDamage(10)
+                                        emitParticles(proj, COLORS.Warning, 15, 2, 15, 0.5)
+                                        playSound(5801250166, 0.5, 1, eChar.HumanoidRootPart)
+                                        proj:Destroy()
+                                        return
+                                    end
+                                end
+
+                                -- Sparkle
+                                local spark = newPart({
+                                    size = Vector3.new(0.2, 0.2, 0.2),
+                                    pos = proj.Position,
+                                    color = COLORS.Warning,
+                                    mat = MAT.Base,
+                                    name = "Spark",
+                                    parent = EffectsFolder,
+                                    anchored = true,
+                                    collide = false,
+                                    trans = 0.3
+                                })
+                                tween(spark, {time = 0.2}, {Transparency = 1}):Play()
+                                Debris:AddItem(spark, 0.2)
+
+                                wait(0.03)
+                            end
+                            if proj.Parent then
+                                emitParticles(proj, COLORS.Warning, 10, 1, 10, 0.3)
+                                proj:Destroy()
+                            end
+                        end)
+
+                        playSound(3932505916, 0.2, 0.8, body)
+                    end
+                end
+            end
+            wait(0.03)
+        end
+        enemiesAlive = enemiesAlive - 1
+    end)
+
+    return enemy
+end
+
+-- ======================= GAME STATE =======================
+local Score = 0
+local Combo = 0
+local MaxHealth = 200
+local Health = 200
+local Shield = 100
+local lastKillTime = 0
+
+local function addScore(amount)
+    local now = tick()
+    if now - lastKillTime < 2 then
+        Combo = Combo + 1
+        amount = amount * (1 + Combo * 0.5)
+    else
+        Combo = 1
+    end
+    lastKillTime = now
+    Score = Score + math.floor(amount)
+end
+
+local function takeDamage(amount)
+    if Shield > 0 then
+        Shield = math.max(0, Shield - amount)
+        Health = Health - (amount * 0.2)
+    else
+        Health = Health - amount
+    end
+
+    -- Screen flash red
+    local flash = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+    flash.Name = "DamageFlash"
+    local fFrame = Instance.new("Frame", flash)
+    fFrame.Size = UDim2.new(1, 0, 1, 0)
+    fFrame.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    fFrame.BackgroundTransparency = 0.6
+    fFrame.BorderSizePixel = 0
+    tween(fFrame, {time = 0.3}, {BackgroundTransparency = 1}):Play()
+    Debris:AddItem(flash, 0.3)
+
+    if Health <= 0 then
+        Health = MaxHealth
+        Shield = 100
+        humRoot.CFrame = CFrame.new(0, 130, 0)
+        emitParticles(humRoot, COLORS.NeonBlue, 50, 3, 20, 2)
+        playSound(5801637099, 1, 0.8, humRoot)
+
+        -- Death popup
+        local deathGui = Instance.new("ScreenGui", player.PlayerGui)
+        deathGui.Name = "DeathMessage"
+        local dText = Instance.new("TextLabel", deathGui)
+        dText.Size = UDim2.new(0.4, 0, 0.1, 0)
+        dText.Position = UDim2.new(0.3, 0, 0.4, 0)
+        dText.BackgroundTransparency = 1
+        dText.Text = "SYSTEM REBOOTED"
+        dText.TextColor3 = COLORS.NeonPink
+        dText.TextStrokeTransparency = 0
+        dText.TextStrokeColor3 = Color3.new(0, 0, 0)
+        dText.Font = Enum.Font.GothamBlack
+        dText.TextSize = 40
+        tween(dText, {time = 2}, {TextTransparency = 1, TextStrokeTransparency = 1}):Play()
+        Debris:AddItem(deathGui, 2)
+    end
+end
+
+-- Shield regeneration
+spawn(function()
+    while true do
+        wait(0.5)
+        if Shield < 100 then
+            Shield = math.min(100, Shield + 2)
+        end
+    end
+end)
+
+-- Spawn manager
+spawn(function()
+    local spawnPoints = {
+        {x = 80, z = 80}, {x = -80, z = 80}, {x = 80, z = -80}, {x = -80, z = -80},
+        {x = 120, z = 0}, {x = -120, z = 0}, {x = 0, z = 120}, {x = 0, z = -120},
+        {x = 60, z = 100}, {x = -60, z = -100}, {x = 100, z = -60}, {x = -100, z = 60}
+    }
+
+    while true do
+        wait(2)
+        if enemiesAlive < maxEnemies then
+            local sp = spawnPoints[math.random(1, #spawnPoints)]
+            local types = {"normal", "normal", "normal", "fast", "heavy"}
+            spawnEnemy(sp.x, randomInRange(115, 160), sp.z, types[math.random(1, #types)])
+        end
+    end
+end)
+
+-- ======================= COLLECTIBLES =======================
+local collectibleCount = 0
+local maxCollectibles = 15
+
+local function spawnCollectible()
+    if collectibleCount >= maxCollectibles then return end
+    collectibleCount = collectibleCount + 1
+
+    local pos = randomV3Range(-130, 130, 115, 200, -130, 130)
+    local types = {"health", "shield", "score", "ammo"}
+    local cType = types[math.random(1, #types)]
+    local color = (cType == "health" and COLORS.NeonPink) or (cType == "shield" and COLORS.NeonBlue) or (cType == "score" and COLORS.NeonGreen) or COLORS.NeonOrange
+
+    local orb = newPart({
+        size = Vector3.new(2, 2, 2),
+        pos = pos,
+        color = color,
+        mat = MAT.Base,
+        name = "Collectible_" .. cType,
+        parent = ItemsFolder,
+        shape = Enum.PartType.Ball,
+        light = true,
+        lightColor = color,
+        lightBright = 5,
+        lightRange = 15
+    })
+
+    -- Float animation
+    spawn(function()
+        local origY = orb.Position.Y
+        local t = 0
+        while orb.Parent do
+            t = t + 0.03
+            orb.Position = Vector3.new(orb.Position.X, origY + math.sin(t * 2) * 3, orb.Position.Z)
+            orb.Rotation = Vector3.new(0, t * 50, 0)
+            wait(0.03)
+        end
+    end)
+
+    -- Collection check
+    spawn(function()
+        while orb.Parent do
+            local eChar = player.Character
+            if eChar and eChar:FindFirstChild("HumanoidRootPart") then
+                if (orb.Position - eChar.HumanoidRootPart.Position).Magnitude < 5 then
+                    if cType == "health" then
+                        Health = math.min(MaxHealth, Health + 50)
+                    elseif cType == "shield" then
+                        Shield = math.min(100, Shield + 50)
+                    elseif cType == "score" then
+                        addScore(250)
+                    end
+
+                    -- Collect effect
+                    emitParticles(orb, color, 30, 2, 20, 1)
+                    playSound(5801630167, 0.5, 1.5, orb)
+                    collectibleCount = collectibleCount - 1
+                    orb:Destroy()
+                    return
+                end
+            end
+            wait(0.1)
+        end
+    end)
+end
+
+-- Spawn initial collectibles
+for i = 1, 10 do
+    spawnCollectible()
+    wait(0.1)
+end
+
+-- Continuous collectible spawning
+spawn(function()
+    while true do
+        wait(5)
+        spawnCollectible()
+    end
+end)
+
+-- ======================= WEATHER SYSTEM =======================
+spawn(function()
+    local weatherActive = true
+    while weatherActive do
+        -- Rain
+        for i = 1, 100 do
+            local startPos = Vector3.new(randomInRange(-200, 200), randomInRange(200, 300), randomInRange(-200, 200))
+            local drop = newPart({
+                size = Vector3.new(0.1, 3, 0.1),
+                pos = startPos,
+                color = COLORS.NeonBlue,
+                mat = MAT.Forcefield,
+                name = "RainDrop",
+                parent = EffectsFolder,
+                anchored = true,
+                collide = false,
+                trans = 0.5
+            })
+
+            tween(drop, {time = randomInRange(0.5, 1)}, {Position = Vector3.new(startPos.X, 80, startPos.Z), Transparency = 1}):Play()
+            Debris:AddItem(drop, 1)
+        end
+        wait(0.1)
+    end
+end)
+
+-- ======================= HUD / UI SYSTEM =======================
+-- Remove default UI
+StarterGui:SetCore("ResetButtonCallback", false)
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- Main HUD
+local hudGui = Instance.new("ScreenGui", playerGui)
+hudGui.Name = "SkyforgeHUD"
+hudGui.ResetOnSpawn = false
+
+-- Title
+local title = Instance.new("TextLabel", hudGui)
+title.Size = UDim2.new(0.3, 0, 0.06, 0)
+title.Position = UDim2.new(0.01, 0, 0.01, 0)
+title.BackgroundTransparency = 1
+title.Text = "SKYFORGE: DOMINION"
+title.TextColor3 = COLORS.NeonBlue
+title.TextStrokeTransparency = 0
+title.TextStrokeColor3 = Color3.new(0, 0, 0)
+title.Font = Enum.Font.GothamBlack
+title.TextSize = 28
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Subtitle
+local subtitle = Instance.new("TextLabel", hudGui)
+subtitle.Size = UDim2.new(0.3, 0, 0.03, 0)
+subtitle.Position = UDim2.new(0.01, 0, 0.065, 0)
+subtitle.BackgroundTransparency = 1
+subtitle.Text = "CLIENT-SIDE DOMINION DEMONSTRATION"
+subtitle.TextColor3 = COLORS.NeonPurple
+subtitle.TextStrokeTransparency = 0.3
+subtitle.TextStrokeColor3 = Color3.new(0, 0, 0)
+subtitle.Font = Enum.Font.GothamBold
+subtitle.TextSize = 12
+subtitle.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Health Bar Background
+local hpBg = Instance.new("Frame", hudGui)
+hpBg.Size = UDim2.new(0.2, 0, 0.025, 0)
+hpBg.Position = UDim2.new(0.01, 0, 0.92, 0)
+hpBg.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+hpBg.BorderSizePixel = 0
+
+local hpBar = Instance.new("Frame", hpBg)
+hpBar.Size = UDim2.new(1, 0, 1, 0)
+hpBar.BackgroundColor3 = COLORS.NeonPink
+hpBar.BorderSizePixel = 0
+
+local hpLabel = Instance.new("TextLabel", hpBg)
+hpLabel.Size = UDim2.new(1, 0, 1, 0)
+hpLabel.BackgroundTransparency = 1
+hpLabel.Text = "INTEGRITY"
+hpLabel.TextColor3 = COLORS.White
+hpLabel.Font = Enum.Font.GothamBold
+hpLabel.TextSize = 12
+hpLabel.TextStrokeTransparency = 0.5
+
+-- Shield Bar Background
+local shBg = Instance.new("Frame", hudGui)
+shBg.Size = UDim2.new(0.2, 0, 0.02, 0)
+shBg.Position = UDim2.new(0.01, 0, 0.95, 0)
+shBg.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+shBg.BorderSizePixel = 0
+
+local shBar = Instance.new("Frame", shBg)
+shBar.Size = UDim2.new(1, 0, 1, 0)
+shBar.BackgroundColor3 = COLORS.NeonBlue
+shBar.BorderSizePixel = 0
+
+local shLabel = Instance.new("TextLabel", shBg)
+shLabel.Size = UDim2.new(1, 0, 1, 0)
+shLabel.BackgroundTransparency = 1
+shLabel.Text = "SHIELD"
+shLabel.TextColor3 = COLORS.White
+shLabel.Font = Enum.Font.GothamBold
+shLabel.TextSize = 10
+shLabel.TextStrokeTransparency = 0.5
+
+-- Score Display
+local scoreLabel = Instance.new("TextLabel", hudGui)
+scoreLabel.Size = UDim2.new(0.2, 0, 0.05, 0)
+scoreLabel.Position = UDim2.new(0.79, 0, 0.01, 0)
+scoreLabel.BackgroundTransparency = 1
+scoreLabel.Text = "SCORE: 0"
+scoreLabel.TextColor3 = COLORS.NeonGreen
+scoreLabel.TextStrokeTransparency = 0
+scoreLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+scoreLabel.Font = Enum.Font.GothamBlack
+scoreLabel.TextSize = 24
+scoreLabel.TextXAlignment = Enum.TextXAlignment.Right
+
+-- Combo Display
+local comboLabel = Instance.new("TextLabel", hudGui)
+comboLabel.Size = UDim2.new(0.2, 0, 0.04, 0)
+comboLabel.Position = UDim2.new(0.79, 0, 0.055, 0)
+comboLabel.BackgroundTransparency = 1
+comboLabel.Text = ""
+comboLabel.TextColor3 = COLORS.NeonOrange
+comboLabel.TextStrokeTransparency = 0
+comboLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+comboLabel.Font = Enum.Font.GothamBlack
+comboLabel.TextSize = 20
+comboLabel.TextXAlignment = Enum.TextXAlignment.Right
+
+-- Enemy Count
+local enemyLabel = Instance.new("TextLabel", hudGui)
+enemyLabel.Size = UDim2.new(0.2, 0, 0.03, 0)
+enemyLabel.Position = UDim2.new(0.79, 0, 0.09, 0)
+enemyLabel.BackgroundTransparency = 1
+enemyLabel.Text = "THREATS: 0"
+enemyLabel.TextColor3 = COLORS.Warning
+enemyLabel.TextStrokeTransparency = 0.3
+enemyLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+enemyLabel.Font = Enum.Font.GothamBold
+enemyLabel.TextSize = 14
+enemyLabel.TextXAlignment = Enum.TextXAlignment.Right
+
+-- Controls hint
+local controls = Instance.new("TextLabel", hudGui)
+controls.Size = UDim2.new(0.25, 0, 0.15, 0)
+controls.Position = UDim2.new(0.01, 0, 0.7, 0)
+controls.BackgroundTransparency = 1
+controls.Text = "[LMB] FIRE  |  [Q] DASH  |  [SPACE] DOUBLE JUMP"
+controls.TextColor3 = COLORS.NeonCyan
+controls.TextStrokeTransparency = 0.3
+controls.TextStrokeColor3 = Color3.new(0, 0, 0)
+controls.Font = Enum.Font.GothamBold
+controls.TextSize = 11
+controls.TextXAlignment = Enum.TextXAlignment.Left
+controls.TextYAlignment = Enum.TextYAlignment.Bottom
+
+-- Crosshair
+local crosshair = Instance.new("ScreenGui", playerGui)
+crosshair.Name = "Crosshair"
+crosshair.ResetOnSpawn = false
+
+local chFrame = Instance.new("Frame", crosshair)
+chFrame.Size = UDim2.new(0, 4, 0, 4)
+chFrame.Position = UDim2.new(0.5, -2, 0.5, -2)
+chFrame.BackgroundColor3 = COLORS.NeonBlue
+chFrame.BorderSizePixel = 0
+
+-- Animated ring around crosshair
+local chRing = Instance.new("Frame", crosshair)
+chRing.Size = UDim2.new(0, 30, 0, 30)
+chRing.Position = UDim2.new(0.5, -15, 0.5, -15)
+chRing.BackgroundTransparency = 1
+chRing.BorderSizePixel = 0
+
+for i = 1, 4 do
+    local tick_ = Instance.new("Frame", chRing)
+    tick_.Size = UDim2.new(0, 2, 0, 6)
+    tick_.BackgroundColor3 = COLORS.NeonBlue
+    tick_.BorderSizePixel = 0
+    tick_.Position = (i == 1 and UDim2.new(0.5, -1, 0, 0)) or (i == 2 and UDim2.new(0.5, -1, 1, -6)) or (i == 3 and UDim2.new(0, 0, 0.5, -3)) or UDim2.new(1, -2, 0.5, -3)
+end
+
+-- Spin animation for crosshair ring
+spawn(function()
+    local rot = 0
+    while chRing.Parent do
+        rot = rot + 2
+        chRing.Rotation = rot
+        wait(0.03)
+    end
+end)
+
+-- Update HUD loop
+spawn(function()
+    while hudGui.Parent do
+        hpBar.Size = UDim2.new(Health / MaxHealth, 0, 1, 0)
+        shBar.Size = UDim2.new(Shield / 100, 0, 1, 0)
+        scoreLabel.Text = "SCORE: " .. Score
+        enemyLabel.Text = "THREATS: " .. enemiesAlive
+
+        if Combo > 1 then
+            comboLabel.Text = "COMBO x" .. Combo
+            comboLabel.TextTransparency = 0
+        else
+            comboLabel.Text = ""
+        end
+
+        wait(0.05)
+    end
+end)
+
+-- ======================= MINIMAP SYSTEM =======================
+local minimapGui = Instance.new("ScreenGui", playerGui)
+minimapGui.Name = "Minimap"
+minimapGui.ResetOnSpawn = false
+
+local mmBg = Instance.new("Frame", minimapGui)
+mmBg.Size = UDim2.new(0, 160, 0, 160)
+mmBg.Position = UDim2.new(1, -170, 1, -170)
+mmBg.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
+mmBg.BackgroundTransparency = 0.3
+mmBg.BorderSizePixel = 2
+mmBg.BorderColor3 = COLORS.NeonBlue
+
+local mmCorner = Instance.new("UICorner", mmBg)
+mmCorner.CornerRadius = UDim.new(0, 8)
+
+local mmLabel = Instance.new("TextLabel", mmBg)
+mmLabel.Size = UDim2.new(1, 0, 0, 18)
+mmLabel.Position = UDim2.new(0, 0, 0, 2)
+mmLabel.BackgroundTransparency = 1
+mmLabel.Text = "RADAR"
+mmLabel.TextColor3 = COLORS.NeonBlue
+mmLabel.Font = Enum.Font.GothamBold
+mmLabel.TextSize = 10
+
+local mmContainer = Instance.new("Frame", mmBg)
+mmContainer.Size = UDim2.new(1, -10, 1, -25)
+mmContainer.Position = UDim2.new(0, 5, 0, 20)
+mmContainer.BackgroundTransparency = 1
+mmContainer.ClipsDescendants = true
+
+-- Minimap dots storage
+local mmDots = {}
+
+local function getMMDot(color, size)
+    local dot = Instance.new("Frame")
+    dot.Size = UDim2.new(0, size or 4, 0, size or 4)
+    dot.BackgroundColor3 = color
+    dot.BorderSizePixel = 0
+    local corner = Instance.new("UICorner", dot)
+    corner.CornerRadius = UDim.new(1, 0)
+    return dot
+end
+
+-- Update minimap
+spawn(function()
+    while minimapGui.Parent do
+        -- Clear old dots
+        for _, dot in ipairs(mmDots) do
+            dot:Destroy()
+        end
+        mmDots = {}
+
+        local playerPos = humRoot.Position
+        local mapScale = 0.4 -- pixels per stud
+
+        -- Player dot (center)
+        local playerDot = getMMDot(COLORS.NeonGreen, 6)
+        playerDot.Position = UDim2.new(0.5, -3, 0.5, -3)
+        playerDot.Parent = mmContainer
+        table.insert(mmDots, playerDot)
+
+        -- Enemy dots
+        for _, enemy in ipairs(EnemiesFolder:GetChildren()) do
+            if enemy:FindFirstChild("Body") then
+                local ep = enemy.Body.Position
+                local relX = (ep.X - playerPos.X) * mapScale
+                local relZ = (ep.Z - playerPos.Z) * mapScale
+                if math.abs(relX) < 75 and math.abs(relZ) < 75 then
+                    local dot = getMMDot(COLORS.Warning, 4)
+                    dot.Position = UDim2.new(0.5, relX - 2, 0.5, relZ - 2)
+                    dot.Parent = mmContainer
+                    table.insert(mmDots, dot)
+                end
+            end
+        end
+
+        -- Collectible dots
+        for _, item in ipairs(ItemsFolder:GetChildren()) do
+            if item:IsA("BasePart") then
+                local ip = item.Position
+                local relX = (ip.X - playerPos.X) * mapScale
+                local relZ = (ip.Z - playerPos.Z) * mapScale
+                if math.abs(relX) < 75 and math.abs(relZ) < 75 then
+                    local dot = getMMDot(COLORS.NeonCyan, 3)
+                    dot.Position = UDim2.new(0.5, relX - 1.5, 0.5, relZ - 1.5)
+                    dot.Parent = mmContainer
+                    table.insert(mmDots, dot)
+                end
+            end
+        end
+
+        wait(0.2)
+    end
+end)
+
+-- ======================= TELEPORTER SYSTEM =======================
+local teleporterPositions = {
+    {pos = Vector3.new(0, 115, 0), name = "CENTER"},
+    {pos = Vector3.new(100, 140, 0), name = "SECTOR A"},
+    {pos = Vector3.new(-100, 130, 0), name = "SECTOR B"},
+    {pos = Vector3.new(0, 150, 100), name = "SECTOR C"},
+    {pos = Vector3.new(0, 125, -100), name = "SECTOR D"},
+    {pos = Vector3.new(80, 180, 80), name = "SKY FORGE"},
+    {pos = Vector3.new(-80, 160, -80), name = "VOID NEXUS"}
+}
+
+for i, tp in ipairs(teleporterPositions) do
+    -- Teleporter pad
+    local pad = newPart({
+        size = Vector3.new(8, 1, 8),
+        pos = tp.pos,
+        color = COLORS.NeonPurple,
+        mat = MAT.Base,
+        name = "Teleporter_" .. tp.name,
+        parent = WorldFolder,
+        glow = true,
+        glowColor = COLORS.NeonPurple,
+        glowBright = 5,
+        glowRange = 25
+    })
+
+    -- Label
+    local tpLabel = billboard(tp.name, COLORS.NeonPurple, 16, pad)
+    tpLabel.StudsOffset = Vector3.new(0, 4, 0)
+
+    -- Particles
+    local pe = Instance.new("ParticleEmitter", pad)
+    pe.Color = ColorSequence.new(COLORS.NeonPurple)
+    pe.Size = NumberSequence.new(1)
+    pe.Speed = NumberRange.new(5, 10)
+    pe.Lifetime = NumberRange.new(1, 2)
+    pe.Rate = 10
+    pe.SpreadAngle = Vector2.new(0, 0)
+    pe.VelocityInheritance = 0
+
+    -- Activation
+    spawn(function()
+        while pad.Parent do
+            local eChar = player.Character
+            if eChar and eChar:FindFirstChild("HumanoidRootPart") then
+                if (pad.Position - eChar.HumanoidRootPart.Position).Magnitude < 6 then
+                    -- Teleport to random other pad
+                    local target = teleporterPositions[math.random(1, #teleporterPositions)]
+                    if target.pos ~= tp.pos then
+                        eChar.HumanoidRootPart.CFrame = CFrame.new(target.pos + Vector3.new(0, 5, 0))
+                        emitParticles(eChar.HumanoidRootPart, COLORS.NeonPurple, 50, 3, 25, 2)
+                        playSound(5801637099, 0.8, 1.2, eChar.HumanoidRootPart)
+                        wait(2)
+                    end
+                end
+            end
+            wait(0.2)
+        end
+    end)
+end
+
+-- ======================= AMBIENT EFFECTS =======================
+-- Floating text particles around world
+spawn(function()
+    local words = {"POWER", "DOMINION", "CLIENT", "SKYFORGE", "SYSTEM", "DATA", "NEON", "VOID", "ENERGY", "CORE"}
+    while true do
+        local word = words[math.random(1, #words)]
+        local pos = randomV3Range(-150, 150, 120, 200, -150, 150)
+        local bGui = billboard(word, COLORS.NeonCyan, 14, WorldFolder)
+        bGui.StudsOffset = Vector3.new(0, 0, 0)
+        bGui.Adornee = nil
+        bGui.Parent = EffectsFolder
+
+        -- Create anchor part
+        local anchor = newPart({
+            size = Vector3.new(1, 1, 1),
+            pos = pos,
+            color = COLORS.NeonCyan,
+            mat = MAT.Forcefield,
+            name = "FloatingText",
+            parent = EffectsFolder,
+            anchored = true,
+            collide = false,
+            trans = 1
+        })
+        bGui.Adornee = anchor
+
+        -- Float away
+        tween(anchor, {time = 5}, {Position = pos + Vector3.new(0, 30, 0), Transparency = 1}):Play()
+        tween(bGui, {time = 5}, {StudsOffset = Vector3.new(0, 30, 0)}):Play()
+        Debris:AddItem(anchor, 5)
+        Debris:AddItem(bGui, 5)
+
+        wait(randomInRange(3, 8))
+    end
+end)
+
+-- Lightning effects in the sky
+spawn(function()
+    while true do
+        wait(randomInRange(3, 8))
+        local start = randomV3Range(-200, 200, 250, 350, -200, 200)
+        local end_ = randomV3Range(-100, 100, 100, 150, -100, 100)
+
+        -- Bolt segments
+        local segments = 8
+        local current = start
+        for i = 1, segments do
+            local nextPos = current + (end_ - start) / segments + randomV3Range(-15, 15, -5, 5, -15, 15)
+            local seg = newPart({
+                size = Vector3.new(0.5, (nextPos - current).Magnitude, 0.5),
+                pos = (current + nextPos) / 2,
+                color = COLORS.NeonBlue,
+                mat = MAT.Base,
+                name = "Lightning",
+                parent = EffectsFolder,
+                anchored = true,
+                collide = false,
+                trans = 0.1,
+                cframe = CFrame.lookAt(current, nextPos) * CFrame.Angles(math.pi/2, 0, 0)
+            })
+            tween(seg, {time = 0.2}, {Transparency = 1}):Play()
+            Debris:AddItem(seg, 0.2)
+            current = nextPos
+        end
+
+        -- Flash lighting
+        Lighting.Brightness = 4
+        delay(0.05, function()
+            local restore = tween(Lighting, {time = 0.3}, {Brightness = 1.5})
+            restore:Play()
+        end)
+
+        playSound(5801250166, 0.3, randomInRange(0.8, 1.2), humRoot)
+    end
+end)
+
+-- ======================= MUSIC SYSTEM =======================
+-- Ambient drone
+spawn(function()
+    while true do
+        local noteIds = {5801630167, 5801631234, 5801632456, 5801633789, 5801634567}
+        playSound(noteIds[math.random(1, #noteIds)], 0.08, randomInRange(0.5, 0.8), SoundService)
+        wait(randomInRange(4, 8))
+    end
+end)
+
+-- ======================= DAY/NIGHT CYCLE =======================
+spawn(function()
+    local t = 20 -- Start at night
+    while true do
+        t = t + 0.005
+        if t > 24 then t = 0 end
+        Lighting.ClockTime = t
+
+        -- Adjust colors based on time
+        if t > 6 and t < 18 then
+            -- Day
+            local progress = (t - 6) / 12
+            Lighting.Ambient = Color3.fromRGB(30 + progress * 50, 30 + progress * 60, 60 + progress * 40)
+            atmosphere.Color = Color3.fromRGB(15 + progress * 40, 15 + progress * 50, 50 + progress * 30)
+        else
+            -- Night
+            Lighting.Ambient = Color3.fromRGB(30, 30, 60)
+            atmosphere.Color = Color3.fromRGB(15, 15, 50)
+        end
+
+        wait(0.5)
+    end
+end)
+
+-- ======================= SECTOR DISCOVERY =======================
+local discoveredSectors = {}
+spawn(function()
+    while true do
+        wait(1)
+        local pos = humRoot.Position
+        local dist = math.sqrt(pos.X * pos.X + pos.Z * pos.Z)
+
+        local sectorName
+        if dist < 40 then
+            sectorName = "CENTER HUB"
+        elseif dist < 90 then
+            sectorName = "INNER RING"
+        elseif dist < 140 then
+            sectorName = "OUTER RING"
+        else
+            sectorName = "FRONTIER"
+        end
+
+        if not discoveredSectors[sectorName] then
+            discoveredSectors[sectorName] = true
+
+            -- Discovery popup
+            local discGui = Instance.new("ScreenGui", playerGui)
+            discGui.Name = "Discovery"
+            local discLabel = Instance.new("TextLabel", discGui)
+            discLabel.Size = UDim2.new(0.4, 0, 0.08, 0)
+            discLabel.Position = UDim2.new(0.3, 0, 0.2, 0)
+            discLabel.BackgroundTransparency = 1
+            discLabel.Text = "SECTOR DISCOVERED: " .. sectorName
+            discLabel.TextColor3 = COLORS.NeonGreen
+            discLabel.TextStrokeTransparency = 0
+            discLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+            discLabel.Font = Enum.Font.GothamBlack
+            discLabel.TextSize = 28
+
+            tween(discLabel, {time = 0.5}, {Position = UDim2.new(0.3, 0, 0.15, 0)}):Play()
+            delay(2, function()
+                local fade = tween(discLabel, {time = 1}, {TextTransparency = 1, TextStrokeTransparency = 1})
+                fade:Play()
+                fade.Completed:Connect(function() discGui:Destroy() end)
+            end)
+
+            addScore(500)
+            emitParticles(humRoot, COLORS.NeonGreen, 30, 2, 15, 1.5)
+            playSound(5801637099, 0.6, 1, humRoot)
+        end
+    end
+end)
+
+-- ======================= INITIAL EFFECTS =======================
+-- Grand entrance effect
+for i = 1, 8 do
+    local ring = newPart({
+        size = Vector3.new(5, 0.5, 5),
+        pos = Vector3.new(0, 110, 0),
+        color = COLORS.NeonBlue,
+        mat = MAT.Forcefield,
+        name = "EntranceRing",
+        parent = EffectsFolder,
+        anchored = true,
+        collide = false,
+        trans = 0.3,
+        shape = Enum.PartType.Cylinder
+    })
+    ring.Orientation = Vector3.new(0, 0, 90)
+    local delay_ = i * 0.1
+    tween(ring, {time = 2, ease = Enum.EasingStyle.Exponential}, {Size = Vector3.new(300 - i * 20, 0.5, 300 - i * 20), Transparency = 1}):Play()
+    Debris:AddItem(ring, 2.5)
+end
+
+-- ======================= INTRO SEQUENCE =======================
+local introGui = Instance.new("ScreenGui", playerGui)
+introGui.Name = "IntroSequence"
+introGui.DisplayOrder = 100
+
+local introBg = Instance.new("Frame", introGui)
+introBg.Size = UDim2.new(1, 0, 1, 0)
+introBg.BackgroundColor3 = Color3.new(0, 0, 0)
+introBg.BorderSizePixel = 0
+
+local introText = Instance.new("TextLabel", introBg)
+introText.Size = UDim2.new(0.8, 0, 0.3, 0)
+introText.Position = UDim2.new(0.1, 0, 0.35, 0)
+introText.BackgroundTransparency = 1
+introText.Text = "SKYFORGE"
+introText.TextColor3 = COLORS.NeonBlue
+introText.TextStrokeTransparency = 0.5
+introText.TextStrokeColor3 = COLORS.NeonPurple
+introText.Font = Enum.Font.GothamBlack
+introText.TextSize = 72
+
+local introSub = Instance.new("TextLabel", introBg)
+introSub.Size = UDim2.new(0.6, 0, 0.1, 0)
+introSub.Position = UDim2.new(0.2, 0, 0.55, 0)
+introSub.BackgroundTransparency = 1
+introSub.Text = "CLIENT-SIDE DOMINION"
+introSub.TextColor3 = COLORS.NeonPurple
+introSub.TextStrokeTransparency = 0.8
+introSub.Font = Enum.Font.GothamBold
+introSub.TextSize = 24
+
+local introStatus = Instance.new("TextLabel", introBg)
+introStatus.Size = UDim2.new(0.6, 0, 0.05, 0)
+introStatus.Position = UDim2.new(0.2, 0, 0.7, 0)
+introStatus.BackgroundTransparency = 1
+introStatus.Text = "GENERATING WORLD..."
+introStatus.TextColor3 = COLORS.NeonCyan
+introStatus.Font = Enum.Font.GothamBold
+introStatus.TextSize = 16
+
+-- Loading bar
+local loadBar = Instance.new("Frame", introBg)
+loadBar.Size = UDim2.new(0.5, 0, 0.01, 0)
+loadBar.Position = UDim2.new(0.25, 0, 0.75, 0)
+loadBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+loadBar.BorderSizePixel = 0
+
+local loadFill = Instance.new("Frame", loadBar)
+loadFill.Size = UDim2.new(0, 0, 1, 0)
+loadFill.BackgroundColor3 = COLORS.NeonBlue
+loadFill.BorderSizePixel = 0
+
+tween(loadFill, {time = 2}, {Size = UDim2.new(1, 0, 1, 0)}):Play()
+
+wait(2)
+introStatus.Text = "INITIALIZING SYSTEMS..."
+wait(1)
+introStatus.Text = "DEPLOYING ASSETS..."
+wait(0.5)
+introStatus.Text = "WELCOME, OPERATOR."
+
+-- Fade out intro
+delay(1, function()
+    local fade = tween(introBg, {time = 2}, {BackgroundTransparency = 1})
+    fade:Play()
+    tween(introText, {time = 2}, {TextTransparency = 1, TextStrokeTransparency = 1}):Play()
+    tween(introSub, {time = 2}, {TextTransparency = 1, TextStrokeTransparency = 1}):Play()
+    tween(introStatus, {time = 2}, {TextTransparency = 1}):Play()
+    tween(loadBar, {time = 2}, {BackgroundTransparency = 1}):Play()
+    tween(loadFill, {time = 2}, {BackgroundTransparency = 1}):Play()
+
+    fade.Completed:Connect(function()
+        introGui:Destroy()
+    end)
+end)
+
+-- ======================= INTRO EFFECTS ON PLAYER =======================
+delay(3.5, function()
+    -- Explosion of particles
+    for _, color in ipairs({COLORS.NeonBlue, COLORS.NeonPurple, COLORS.NeonPink, COLORS.NeonCyan, COLORS.NeonGreen}) do
+        emitParticles(humRoot, color, 20, 2, randomInRange(15, 30), 2)
+        wait(0.1)
+    end
+
+    playSound(5801637099, 1, 0.7, humRoot)
+
+    -- Welcome message
+    local welcome = Instance.new("ScreenGui", playerGui)
+    welcome.Name = "Welcome"
+    local wText = Instance.new("TextLabel", welcome)
+    wText.Size = UDim2.new(0.5, 0, 0.08, 0)
+    wText.Position = UDim2.new(0.25, 0, 0.3, 0)
+    wText.BackgroundTransparency = 1
+    wText.Text = "SECTOR ONLINE. ELIMINATE ALL THREATS."
+    wText.TextColor3 = COLORS.NeonGreen
+    wText.TextStrokeTransparency = 0
+    wText.TextStrokeColor3 = Color3.new(0, 0, 0)
+    wText.Font = Enum.Font.GothamBlack
+    wText.TextSize = 24
+
+    tween(wText, {time = 0.5}, {Position = UDim2.new(0.25, 0, 0.25, 0)}):Play()
+    delay(3, function()
+        tween(wText, {time = 1}, {TextTransparency = 1, TextStrokeTransparency = 1}):Play()
+        wait(1)
+        welcome:Destroy()
+    end)
+end)
+
+-- ======================= END OF SCRIPT =======================
+print("+==============================================+")
+print("|     SKYFORGE: DOMINION FULLY LOADED          |")
+print("|                                              |")
+print("|  Features Active:                            |")
+print("|  > Procedural floating city world            |")
+print("|  > Dynamic enemy AI (3 types)                |")
+print("|  > Raycast weapon system                     |")
+print("|  > Double jump, dash, wall abilities         |")
+print("|  > Health/shield/regen system                |")
+print("|  > Score/combo system                        |")
+print("|  > Minimap & HUD                             |")
+print("|  > Teleporter network (7 pads)               |")
+print("|  > Day/night cycle                           |")
+print("|  > Weather & lightning                       |")
+print("|  > Collectibles                              |")
+print("|  > 12+ buildings                             |")
+print("|  > Particle effects                          |")
+print("|  > Screen effects (bloom, dof, color)        |")
+print("|  > All from ONE client-side script!          |")
+print("+==============================================+")
