@@ -629,7 +629,7 @@
     </style>
 </head>
 <body>
-    
+    <h1 style="text-align:center;">ChatGPT</h1>
     <div class="scroll-wrapper" aria-label="Scrollable UI button samples">
         <div class="scroll-inner">
 
@@ -798,5 +798,375 @@
         </div>
     </div>
 
+    <h1 style="text-align:center;">Kimi k2.6 Instant</h1>
+
+    <style>
+        /* Kimi button styles (added without changing original code) */
+        .kimi-md3 {
+            background: #6750a4; color: #fff; border: none; border-radius: 24px;
+            padding: 16px 32px; font-size: 16px; font-weight: 500; text-transform: uppercase;
+            cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            position: relative; overflow: hidden; transition: box-shadow .2s;
+        }
+        .kimi-md3:hover { box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        .kimi-md2 {
+            background: #6200ee; color: #fff; border: none; border-radius: 4px;
+            padding: 12px 24px; font-size: 14px; font-weight: 600; text-transform: uppercase;
+            cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.26);
+            position: relative; overflow: hidden; transition: box-shadow .2s;
+        }
+        .kimi-md2:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .kimi-md1 {
+            background: #ff4081; color: #fff; border: none; border-radius: 2px;
+            padding: 14px 28px; font-size: 16px; font-weight: 500; text-transform: uppercase;
+            cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.3); transition: all .2s;
+        }
+        .kimi-md1:hover { box-shadow: 0 6px 12px rgba(0,0,0,0.4); transform: translateY(-1px); }
+        .kimi-md1:active { box-shadow: 0 2px 4px rgba(0,0,0,0.3); transform: translateY(1px); }
+        .kimi-glass {
+            background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 16px; padding: 16px 32px; font-size: 16px; cursor: pointer;
+            backdrop-filter: blur(10px); box-shadow: 0 8px 32px rgba(0,0,0,0.1); transition: all .3s;
+        }
+        .kimi-glass:hover { background: rgba(255,255,255,0.2); box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+        .kimi-neumorphism {
+            background: #e0e5ec; color: #4a5568; border: none; border-radius: 50px;
+            padding: 20px 40px; font-size: 16px; font-weight: 600; cursor: pointer;
+            box-shadow: 9px 9px 16px rgb(163,177,198,0.6), -9px -9px 16px rgba(255,255,255,0.5);
+            transition: all .2s;
+        }
+        .kimi-neumorphism:active {
+            box-shadow: inset 9px 9px 16px rgb(163,177,198,0.6), inset -9px -9px 16px rgba(255,255,255,0.5);
+        }
+        .kimi-fluent {
+            background: #0078d4; color: #fff; border: none; border-radius: 2px;
+            padding: 14px 28px; font-size: 14px; font-weight: 600; cursor: pointer;
+            transition: all .2s; position: relative; overflow: hidden;
+        }
+        .kimi-fluent:hover { background: #106ebe; }
+        .kimi-fluent:active { background: #005a9e; transform: scale(0.98); }
+        .kimi-retro {
+            background: transparent; color: #ffb000; border: 3px solid #ffb000;
+            padding: 14px 28px; font-size: 18px; font-weight: bold; text-transform: uppercase;
+            cursor: pointer; box-shadow: 4px 4px 0 #ffb000; transition: all .1s;
+        }
+        .kimi-retro:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 #ffb000; }
+        .kimi-minimal {
+            background: none; color: #000; border: 1px solid #000; padding: 12px 24px;
+            font-size: 14px; font-weight: 300; letter-spacing: 1px; text-transform: uppercase;
+            cursor: pointer; transition: all .3s;
+        }
+        .kimi-minimal:hover { background: #000; color: #fff; }
+        .kimi-cyberpunk {
+            background: transparent; color: #0ff; border: 2px solid #0ff;
+            padding: 16px 32px; font-size: 16px; font-weight: bold; text-transform: uppercase;
+            cursor: pointer; box-shadow: 0 0 10px #0ff, inset 0 0 10px rgba(0,255,255,0.1);
+            text-shadow: 0 0 5px #0ff; transition: all .3s;
+        }
+        .kimi-cyberpunk:hover { background: rgba(0,255,255,0.1); box-shadow: 0 0 20px #0ff, inset 0 0 20px rgba(0,255,255,0.2); }
+        .kimi-vaporwave {
+            background: linear-gradient(90deg,#ff71ce,#01cdfe); color: #fff; border: none;
+            padding: 16px 32px; font-size: 18px; letter-spacing: 2px; text-transform: uppercase;
+            cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: transform .2s;
+        }
+        .kimi-vaporwave:hover { transform: scale(1.05); }
+        .kimi-brutalist {
+            background: #000; color: #fff; border: 4px solid #000; padding: 14px 28px;
+            font-size: 18px; font-weight: bold; text-transform: uppercase; cursor: pointer;
+            box-shadow: 8px 8px 0 #ff0000; transition: all .1s;
+        }
+        .kimi-brutalist:active { transform: translate(4px,4px); box-shadow: 4px 4px 0 #ff0000; }
+        .kimi-luxury {
+            background: transparent; color: #d4af37; border: 1px solid #d4af37;
+            padding: 16px 40px; font-size: 14px; letter-spacing: 3px; text-transform: uppercase;
+            cursor: pointer; transition: all .4s;
+        }
+        .kimi-luxury:hover { background: #d4af37; color: #0a0a0a; }
+        .kimi-pixel {
+            background: #e74c3c; color: #fff; border: none; padding: 12px 24px;
+            font-size: 16px; font-weight: bold; cursor: pointer;
+            box-shadow: inset -4px -4px 0px rgba(0,0,0,0.2), 4px 4px 0px #000;
+            image-rendering: pixelated;
+        }
+        .kimi-pixel:active { transform: translate(2px,2px); box-shadow: inset -2px -2px 0px rgba(0,0,0,0.2), 2px 2px 0px #000; }
+        .kimi-monochrome {
+            background: #333; color: #fff; border: none; border-radius: 0; padding: 14px 28px;
+            font-size: 14px; font-weight: 600; text-transform: uppercase; cursor: pointer;
+            transition: all .2s;
+        }
+        .kimi-monochrome:hover { background: #000; }
+        .kimi-terminal {
+            background: #003b00; color: #00ff00; border: 1px solid #00ff00;
+            padding: 12px 24px; font-size: 16px; cursor: pointer; box-shadow: 0 0 8px #00ff00;
+            text-transform: lowercase; transition: all .2s;
+        }
+        .kimi-terminal:hover { background: #00ff00; color: #000; box-shadow: 0 0 16px #00ff00; }
+        .kimi-softui {
+            background: #fff; color: #5d6d7e; border: none; border-radius: 20px;
+            padding: 16px 32px; font-size: 16px; font-weight: 600; cursor: pointer;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.05); transition: all .2s;
+        }
+        .kimi-softui:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(0,0,0,0.1); }
+        .kimi-softui:active { transform: translateY(0); }
+        .kimi-aurora {
+            background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 30px; padding: 16px 32px; font-size: 16px; cursor: pointer;
+            backdrop-filter: blur(5px); transition: all .3s;
+        }
+        .kimi-aurora:hover { background: rgba(255,255,255,0.1); }
+        .kimi-paper {
+            background: #fff; color: #333; border: none; padding: 14px 28px; font-size: 16px;
+            cursor: pointer; box-shadow: 2px 2px 5px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.05);
+            transition: all .2s;
+        }
+        .kimi-paper:hover { box-shadow: 4px 4px 10px rgba(0,0,0,0.15); transform: translateY(-2px); }
+        .kimi-holographic {
+            background: linear-gradient(45deg,#ff0080,#ff8c00,#40e0d0,#ff0080);
+            background-size: 400% 400%; color: #000; border: none; border-radius: 8px;
+            padding: 16px 32px; font-size: 16px; font-weight: bold; cursor: pointer;
+            animation: kimi-holo 3s ease infinite; box-shadow: 0 0 20px rgba(255,255,255,0.2);
+        }
+        @keyframes kimi-holo { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+        .kimi-holographic:hover { filter: brightness(1.2); }
+        .kimi-arcade {
+            background: #ff0044; color: #fff; border: 4px solid #ffcc00; padding: 16px 32px;
+            font-size: 18px; font-weight: bold; text-transform: uppercase; cursor: pointer;
+            box-shadow: 0 0 15px #ff0044,0 0 30px rgba(255,0,68,0.4);
+            text-shadow: 2px 2px 0 #000; animation: kimi-pulse 1.5s infinite;
+        }
+        @keyframes kimi-pulse { 0%,100%{box-shadow:0 0 15px #ff0044} 50%{box-shadow:0 0 25px #ff0044,0 0 40px rgba(255,0,68,0.6)} }
+        .kimi-arcade:active { transform: scale(0.95); }
+        .kimi-nature {
+            background: #5d4037; color: #d7ccc8; border: 2px solid #8d6e63;
+            border-radius: 24px; padding: 16px 32px; font-size: 16px; cursor: pointer;
+            transition: all .3s;
+        }
+        .kimi-nature:hover { background: #4e342e; transform: translateY(-2px); }
+        .kimi-wireframe {
+            background: transparent; color: #00d4ff; border: 1px solid #00d4ff;
+            padding: 14px 28px; font-size: 14px; text-transform: uppercase; cursor: pointer;
+            transition: all .3s;
+        }
+        .kimi-wireframe:hover { background: rgba(0,212,255,0.1); }
+        .kimi-liquid {
+            background: linear-gradient(90deg,#00f260,#0575e6); color: #fff; border: none;
+            border-radius: 50px; padding: 18px 36px; font-size: 16px; font-weight: 600;
+            cursor: pointer; position: relative; overflow: hidden; transition: all .3s;
+        }
+        .kimi-liquid::before {
+            content: ''; position: absolute; top: 50%; left: 50%; width: 0; height: 0;
+            background: rgba(255,255,255,0.2); border-radius: 50%;
+            transform: translate(-50%,-50%); transition: width .6s, height .6s;
+        }
+        .kimi-liquid:hover::before { width: 300px; height: 300px; }
+        .kimi-industrial {
+            background: #444; color: #aaa; border: 2px solid #666; padding: 14px 28px;
+            font-size: 14px; text-transform: uppercase; cursor: pointer;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 0 #222;
+            transition: all .1s;
+        }
+        .kimi-industrial:active { transform: translateY(4px); box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 0 0 #222; }
+        .kimi-dreamy {
+            background: rgba(255,255,255,0.4); color: #6a1b9a; border: 1px solid rgba(255,255,255,0.6);
+            border-radius: 50px; padding: 16px 32px; font-size: 16px; cursor: pointer;
+            backdrop-filter: blur(10px); box-shadow: 0 8px 32px rgba(255,255,255,0.3);
+            transition: all .3s;
+        }
+        .kimi-dreamy:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(255,255,255,0.4); }
+        .kimi-scifi {
+            background: transparent; color: #00e5ff; border: 1px solid #00e5ff;
+            padding: 14px 32px; font-size: 14px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 2px; cursor: pointer; clip-path: polygon(10% 0,100% 0,100% 70%,90% 100%,0 100%,0 30%);
+            box-shadow: 0 0 10px rgba(0,229,255,0.3); transition: all .3s;
+        }
+        .kimi-scifi:hover { background: rgba(0,229,255,0.1); box-shadow: 0 0 20px rgba(0,229,255,0.5); }
+
+        /* Ripple styles for Kimi's MD3/MD2 */
+        .ripple {
+            position: absolute; border-radius: 50%; background: rgba(255,255,255,0.3);
+            transform: scale(0); animation: ripple .6s linear; pointer-events: none;
+        }
+        @keyframes ripple { to { transform: scale(4); opacity: 0; } }
+    </style>
+
+    <div class="scroll-wrapper" aria-label="Scrollable Kimi button samples">
+        <div class="scroll-inner">
+            <div class="scroll-spacer"></div>
+
+            <!-- 1. MD3 -->
+            <div class="card" style="background:#f3edf7;">
+                <button class="kimi-md3" onclick="createRipple(event)">Material You</button>
+                <span class="card-label">MD3</span>
+            </div>
+
+            <!-- 2. MD2 -->
+            <div class="card" style="background:#fafafa;">
+                <button class="kimi-md2" onclick="createRipple(event)">Material Design</button>
+                <span class="card-label">MD2</span>
+            </div>
+
+            <!-- 3. MD1 -->
+            <div class="card" style="background:#eee;">
+                <button class="kimi-md1">Material</button>
+                <span class="card-label">MD1</span>
+            </div>
+
+            <!-- 4. Glassmorphism -->
+            <div class="card dark-label" style="background:linear-gradient(135deg,#667eea,#764ba2);">
+                <button class="kimi-glass">Glass Button</button>
+                <span class="card-label">Glassmorphism</span>
+            </div>
+
+            <!-- 5. Neumorphism -->
+            <div class="card" style="background:#e0e5ec;">
+                <button class="kimi-neumorphism">Soft Touch</button>
+                <span class="card-label">Neumorphism</span>
+            </div>
+
+            <!-- 6. Fluent UI -->
+            <div class="card" style="background:linear-gradient(135deg,#f3f2f1,#ffffff);">
+                <button class="kimi-fluent">Fluent</button>
+                <span class="card-label">Fluent UI</span>
+            </div>
+
+            <!-- 7. Retro -->
+            <div class="card dark-label" style="background:#1a1a2e;">
+                <button class="kimi-retro">Retro_Click</button>
+                <span class="card-label">Retro</span>
+            </div>
+
+            <!-- 8. Minimal -->
+            <div class="card" style="background:#fff;">
+                <button class="kimi-minimal">Minimal</button>
+                <span class="card-label">Minimal</span>
+            </div>
+
+            <!-- 9. Cyberpunk -->
+            <div class="card dark-label" style="background:#0d0221;">
+                <button class="kimi-cyberpunk">Neon</button>
+                <span class="card-label">Cyberpunk</span>
+            </div>
+
+            <!-- 10. Vaporwave -->
+            <div class="card dark-label" style="background:linear-gradient(180deg,#2d1b4e 0%,#ff71ce 100%);">
+                <button class="kimi-vaporwave">A E S T H E T I C</button>
+                <span class="card-label">Vaporwave</span>
+            </div>
+
+            <!-- 11. Brutalist -->
+            <div class="card" style="background:#fff;">
+                <button class="kimi-brutalist">RAW</button>
+                <span class="card-label">Brutalist</span>
+            </div>
+
+            <!-- 12. Luxury -->
+            <div class="card dark-label" style="background:#0a0a0a;">
+                <button class="kimi-luxury">Exclusive</button>
+                <span class="card-label">Luxury</span>
+            </div>
+
+            <!-- 13. Pixel Art -->
+            <div class="card dark-label" style="background:#2c3e50;">
+                <button class="kimi-pixel">START</button>
+                <span class="card-label">Pixel Art</span>
+            </div>
+
+            <!-- 14. Monochrome -->
+            <div class="card" style="background:#f0f0f0;">
+                <button class="kimi-monochrome">Mono</button>
+                <span class="card-label">Monochrome</span>
+            </div>
+
+            <!-- 15. Terminal -->
+            <div class="card dark-label" style="background:#000;">
+                <button class="kimi-terminal">execute</button>
+                <span class="card-label">Terminal</span>
+            </div>
+
+            <!-- 16. Soft UI -->
+            <div class="card" style="background:#f0f4f8;">
+                <button class="kimi-softui">Soft</button>
+                <span class="card-label">Soft UI</span>
+            </div>
+
+            <!-- 17. Aurora -->
+            <div class="card dark-label" style="background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);">
+                <button class="kimi-aurora">Aurora</button>
+                <span class="card-label">Aurora</span>
+            </div>
+
+            <!-- 18. Paper -->
+            <div class="card" style="background:#f5f5dc;">
+                <button class="kimi-paper">Paper</button>
+                <span class="card-label">Paper</span>
+            </div>
+
+            <!-- 19. Holographic -->
+            <div class="card dark-label" style="background:#050505;">
+                <button class="kimi-holographic">Holo</button>
+                <span class="card-label">Holographic</span>
+            </div>
+
+            <!-- 20. Arcade -->
+            <div class="card dark-label" style="background:#111;">
+                <button class="kimi-arcade">INSERT COIN</button>
+                <span class="card-label">Arcade</span>
+            </div>
+
+            <!-- 21. Nature -->
+            <div class="card dark-label" style="background:linear-gradient(135deg,#2d5a27,#5d4037);">
+                <button class="kimi-nature">Explore</button>
+                <span class="card-label">Nature</span>
+            </div>
+
+            <!-- 22. Wireframe -->
+            <div class="card dark-label" style="background:#001233;">
+                <button class="kimi-wireframe">Blueprint</button>
+                <span class="card-label">Wireframe</span>
+            </div>
+
+            <!-- 23. Liquid -->
+            <div class="card dark-label" style="background:#1a1a2e;">
+                <button class="kimi-liquid">Flow</button>
+                <span class="card-label">Liquid</span>
+            </div>
+
+            <!-- 24. Industrial -->
+            <div class="card dark-label" style="background:#2b2b2b;">
+                <button class="kimi-industrial">Machine</button>
+                <span class="card-label">Industrial</span>
+            </div>
+
+            <!-- 25. Dreamy -->
+            <div class="card" style="background:linear-gradient(135deg,#ffecd2,#fcb69f);">
+                <button class="kimi-dreamy">Dream</button>
+                <span class="card-label">Dreamy</span>
+            </div>
+
+            <!-- 26. Sci-Fi -->
+            <div class="card dark-label" style="background:#050505;">
+                <button class="kimi-scifi">System</button>
+                <span class="card-label">Sci-Fi</span>
+            </div>
+
+            <div class="scroll-spacer-end"></div>
+        </div>
+    </div>
+
+    <script>
+        /* Ripple effect for Kimi's MD3 and MD2 buttons (unchanged original code unaffected) */
+        function createRipple(e) {
+            const btn = e.currentTarget;
+            const circle = document.createElement('span');
+            const d = Math.max(btn.clientWidth, btn.clientHeight);
+            circle.style.width = circle.style.height = d + 'px';
+            circle.style.left = e.clientX - btn.getBoundingClientRect().left - d/2 + 'px';
+            circle.style.top = e.clientY - btn.getBoundingClientRect().top - d/2 + 'px';
+            circle.classList.add('ripple');
+            const existing = btn.querySelector('.ripple');
+            if (existing) existing.remove();
+            btn.appendChild(circle);
+        }
+    </script>
 </body>
 </html>
